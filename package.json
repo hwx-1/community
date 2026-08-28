@@ -1,0 +1,11 @@
+{
+  "name": "xsnbb",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.14.0",
+  "scripts": {
+    "dev:web": "pnpm --filter @xsnbb/web dev",
+    "dev:admin": "pnpm --filter @xsnbb/admin dev",
+    "build": "pnpm -r build"
+  }
+}

@@ -1,0 +1,9 @@
+DROP TABLE IF EXISTS admin_audit_logs;
+DROP TABLE IF EXISTS account_roles;
+DROP TABLE IF EXISTS role_permissions;
+DROP TABLE IF EXISTS permissions;
+DROP TABLE IF EXISTS roles;
+DROP TABLE IF EXISTS student_bindings;
+DROP TABLE IF EXISTS student_verifications;
+DROP TABLE IF EXISTS profiles;
+DROP TABLE IF EXISTS accounts;
