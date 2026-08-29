@@ -1,0 +1,140 @@
+.toolHead { min-height: 52px; padding: 6px 2px 10px; display: grid; grid-template-columns: 38px 1fr auto; align-items: center; gap: 10px; }
+.toolHead > button { width: 36px; height: 36px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 50%; background: var(--surface); color: var(--text-muted); box-shadow: var(--shadow-sm); }
+.toolHead > button:hover { color: var(--brand); }
+.toolHead > button svg { width: 18px; }
+.toolHead > div { min-width: 0; }
+.toolHead > div > span { color: var(--brand); font-size: 10px; font-weight: 700; letter-spacing: .12em; }
+.toolHead h1 { margin: 2px 0 0; font-size: 22px; letter-spacing: -.02em; }
+.aiHeadActions { display: flex; gap: 6px; }
+.aiHeadActions button { width: 34px; height: 34px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 50%; color: var(--text-muted); background: var(--surface-subtle); }
+.aiHeadActions button:hover { color: var(--brand); background: var(--brand-soft); }
+.aiHeadActions svg { width: 16px; }
+.demoBadge { padding: 4px 10px; border-radius: var(--r-pill); color: var(--brand); background: var(--brand-soft); font-size: 11px; font-weight: 600; }
+
+/* AI 问答 */
+.aiShell { min-height: calc(100vh - 112px); display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow-sm); }
+.aiShell .toolHead { padding: 10px 16px; border-bottom: 1px solid var(--border-light); }
+.aiShell .toolHead > button { box-shadow: none; background: var(--surface-subtle); }
+.aiToolbar { min-height: 44px; padding: 8px 16px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border-light); background: var(--surface-subtle); }
+.aiToolbar label { color: var(--text-soft); font-size: 12px; }
+.aiToolbar select { padding: 5px 10px; border: 1px solid var(--border); border-radius: var(--r-pill); outline: 0; background: var(--surface); color: var(--text); font-size: 12px; }
+.aiToolbar select:focus { border-color: var(--brand); }
+.aiToolbar > span { margin-left: auto; display: flex; align-items: center; gap: 5px; color: var(--text-muted); font-size: 12px; }
+.aiToolbar > span svg { width: 13px; }
+.aiToolbar strong { color: var(--brand); }
+.aiHistory { padding: 12px 16px; display: grid; grid-template-columns: minmax(120px, 1fr) repeat(2, minmax(100px, 160px)); gap: 8px; border-bottom: 1px solid var(--border-light); background: var(--surface); }
+.aiHistory > div { display: flex; flex-direction: column; }
+.aiHistory strong { font-size: 13px; font-weight: 600; }
+.aiHistory small { color: var(--text-soft); font-size: 12px; }
+.historyItem { min-width: 0; height: 36px; display: grid; grid-template-columns: 1fr 32px; border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden; background: var(--surface); }
+.historyItem button { min-width: 0; padding: 0 10px; overflow: hidden; border: 0; background: var(--surface); color: var(--text-muted); font-size: 12px; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+.historyItem button:hover { color: var(--brand); background: var(--brand-soft); }
+.historyItem button:last-child { padding: 0; display: grid; place-items: center; border-left: 1px solid var(--border-light); }
+.historyItem svg { width: 13px; color: var(--text-soft); }
+.aiHistory > p { margin: 0; color: var(--text-soft); font-size: 12px; }
+
+.aiMessages { min-height: 400px; padding: 22px; flex: 1; display: flex; flex-direction: column; gap: 18px; overflow-y: auto; background: var(--surface-subtle); }
+.aiWelcome { max-width: 460px; margin: auto; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.aiWelcome > span { width: 52px; height: 52px; display: grid; place-items: center; border-radius: var(--r-lg); color: var(--brand); background: var(--brand-soft); }
+.aiWelcome > span svg { width: 24px; }
+.aiWelcome h2 { margin: 14px 0 4px; font-size: 20px; }
+.aiWelcome > p { margin: 0 0 18px; color: var(--text-muted); font-size: 13px; }
+.aiWelcome > div { width: 100%; display: grid; gap: 8px; }
+.aiWelcome button { min-height: 40px; padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); color: var(--text-muted); font-size: 13px; text-align: left; }
+.aiWelcome button:hover { border-color: var(--brand); color: var(--brand); }
+.aiWelcome button svg { width: 15px; }
+
+.aiUser, .aiAnswer { display: flex; align-items: flex-start; gap: 10px; }
+.aiUser { justify-content: flex-end; }
+.aiUser > span, .aiAnswer > span { width: 32px; height: 32px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 50%; font-size: 12px; font-weight: 600; }
+.aiUser > span { order: 2; color: var(--brand-dark); background: var(--brand-soft); }
+.aiAnswer > span { color: #fff; background: var(--brand); }
+.aiAnswer > span svg { width: 16px; }
+.aiUser > div, .aiAnswer > div { max-width: 78%; }
+.aiUser p, .aiAnswer p { margin: 0; padding: 10px 14px; border-radius: var(--r-lg) var(--r-lg) var(--r-lg) 4px; background: var(--surface); color: var(--text); font-size: 14px; line-height: 1.7; box-shadow: var(--shadow-sm); }
+.aiUser p { border-radius: var(--r-lg) var(--r-lg) 4px var(--r-lg); color: #fff; background: var(--brand); box-shadow: none; }
+.aiAnswer footer { margin-top: 6px; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; color: var(--text-soft); font-size: 12px; }
+.aiAnswer footer button { padding: 3px 9px; display: inline-flex; align-items: center; gap: 4px; border: 0; border-radius: var(--r-pill); color: var(--brand); background: var(--brand-soft); font-size: 12px; }
+.aiAnswer footer svg { width: 12px; }
+
+.thinking { min-height: 42px; padding: 10px 14px; display: flex; align-items: center; gap: 4px; border-radius: var(--r-lg) var(--r-lg) var(--r-lg) 4px; background: var(--surface); box-shadow: var(--shadow-sm); }
+.thinking i { width: 5px; height: 5px; border-radius: 50%; background: var(--brand); animation: pulse 1s infinite alternate; }
+.thinking i:nth-child(2) { animation-delay: .2s; }
+.thinking i:nth-child(3) { animation-delay: .4s; }
+.thinking small { margin-left: 6px; color: var(--text-soft); font-size: 12px; }
+
+.aiComposer { padding: 12px 16px; border-top: 1px solid var(--border-light); background: var(--surface); }
+.aiComposer textarea { width: 100%; min-height: 56px; padding: 10px 14px; resize: none; border: 1px solid transparent; border-radius: var(--r-md); outline: 0; background: var(--surface-subtle); font-size: 14px; line-height: 1.6; }
+.aiComposer textarea:focus { border-color: var(--brand); background: var(--surface); box-shadow: 0 0 0 3px var(--brand-soft); }
+.aiComposer > div { margin-top: 8px; display: flex; align-items: center; justify-content: space-between; }
+.aiComposer > div > span { color: var(--text-soft); font-size: 12px; }
+.aiComposer button { height: 36px; padding: 0 18px; display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: var(--r-pill); color: #fff; background: var(--brand); font-size: 13px; font-weight: 600; }
+.aiComposer button:hover { background: var(--brand-hover); }
+.aiComposer button:disabled { opacity: .4; }
+.aiComposer button svg { width: 14px; }
+
+/* 校园地图 */
+.mapCard { overflow: hidden; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow-sm); }
+.mapToolbar { min-height: 60px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-light); }
+.mapToolbar > div:first-child { display: flex; flex-direction: column; }
+.mapToolbar strong { font-size: 15px; font-weight: 600; }
+.mapToolbar span { color: var(--text-soft); font-size: 12px; }
+.mapToolbar > div:last-child { display: flex; align-items: center; gap: 8px; }
+.mapToolbar button { width: 32px; height: 32px; padding: 0; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 50%; background: var(--surface); color: var(--text-muted); }
+.mapToolbar button:hover { color: var(--brand); border-color: var(--brand); }
+.mapToolbar button svg { width: 15px; }
+/* 演示地图为自包含插画:草地 #eef3ec / 道路 #fff / 路缘 #d9dfd6 无语义令牌对应,深浅主题下保持同一套插画配色 */
+.campusMap { position: relative; height: 460px; overflow: hidden; background: #eef3ec; transition: .2s ease; transform-origin: center; }
+.mapZoom0 { transform: scale(1); }
+.mapZoom1 { transform: scale(1.08); }
+.mapZoom2 { transform: scale(1.18); }
+.mapRoadA, .mapRoadB { position: absolute; background: #fff; box-shadow: 0 0 0 1px #d9dfd6; }
+.mapRoadA { top: -10%; left: 48%; width: 42px; height: 120%; transform: rotate(8deg); }
+.mapRoadB { top: 50%; left: -10%; width: 120%; height: 38px; transform: rotate(-5deg); }
+.building { position: absolute; padding: 14px 20px; display: grid; place-items: center; border: 2px solid var(--brand-border); border-radius: var(--r-sm); color: var(--brand-dark); background: var(--brand-soft); font-size: 12px; font-weight: 600; box-shadow: var(--shadow-sm); }
+.buildingA { top: 13%; left: 12%; width: 130px; height: 84px; }
+.buildingB { top: 19%; right: 12%; width: 145px; height: 64px; }
+.buildingC { bottom: 16%; left: 16%; width: 120px; height: 76px; }
+.buildingD { right: 10%; bottom: 12%; width: 152px; height: 86px; }
+.mapGate { position: absolute; bottom: 5%; left: 48%; padding: 4px 12px; border-radius: var(--r-pill); color: #fff; background: var(--text-muted); font-size: 11px; }
+
+/* 提示条(地图 / 链接页共用) */
+.infoBar, .linkNotice { padding: 12px 16px; display: flex; align-items: center; gap: 10px; border: 1px solid var(--brand-border); border-radius: var(--r-md); color: var(--brand-dark); background: var(--brand-softer); }
+.infoBar > svg, .linkNotice svg { width: 18px; flex: 0 0 auto; color: var(--brand); }
+.infoBar p { margin: 0; display: flex; flex-direction: column; }
+.infoBar strong { font-size: 13px; font-weight: 600; }
+.infoBar span { color: var(--text-muted); font-size: 12px; }
+.linkNotice { margin-bottom: 16px; font-size: 13px; }
+
+/* 常用链接 */
+.linkGroup { margin-bottom: 18px; }
+.linkGroup h2 { margin: 6px 2px 10px; font-size: 15px; font-weight: 600; }
+.linkGroup > div { overflow: hidden; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow-sm); }
+.linkGroup button { width: 100%; min-height: 68px; padding: 12px 16px; display: grid; grid-template-columns: 40px 1fr 16px; align-items: center; gap: 12px; border: 0; border-bottom: 1px solid var(--border-light); background: var(--surface); color: inherit; text-align: left; }
+.linkGroup button:last-child { border-bottom: 0; }
+.linkGroup button:hover { background: var(--surface-subtle); }
+.linkGroup button > span { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 10px; color: var(--brand); background: var(--brand-soft); }
+.linkGroup button > span svg { width: 18px; }
+.linkGroup button > div { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.linkGroup strong { font-size: 14px; font-weight: 600; }
+.linkGroup small { color: var(--text-soft); font-size: 12px; }
+.linkGroup button > svg { width: 15px; color: var(--text-soft); }
+
+@keyframes pulse { from { opacity: .25; transform: translateY(1px); } to { opacity: 1; transform: translateY(-1px); } }
+
+@media (max-width: 720px) {
+  .aiShell { min-height: calc(100vh - 92px); margin: -4px -1px 0; border-radius: var(--r-md); }
+  .aiMessages { padding: 16px 12px; }
+  .aiUser > div, .aiAnswer > div { max-width: 86%; }
+  .aiToolbar label { display: none; }
+  .aiToolbar select { max-width: 150px; }
+  .aiHistory { grid-template-columns: 1fr; }
+  .aiHistory > div { margin-bottom: 2px; }
+  .aiComposer > div > span { display: none; }
+  .aiComposer > div { justify-content: flex-end; }
+  .campusMap { height: 390px; }
+  .buildingA { left: 6%; }
+  .buildingB { right: 6%; }
+  .buildingC { left: 8%; }
+  .buildingD { right: 5%; width: 135px; }
+}

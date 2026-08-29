@@ -1,38 +1,118 @@
 :root {
-  --brand: #2563eb;
-  --brand-soft: #eff6ff;
-  --brand-soft-strong: #dbeafe;
-  --brand-text: #1e3a8a;
-  --brand-on: #ffffff;
+  font-family: Inter, "SF Pro Text", "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+  color: #121212;
+  background: #f6f6f7;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+
+  /* 品牌色:小红书红系 */
+  --brand: #ff2442;
+  --brand-hover: #f01a38;
+  --brand-dark: #d61531;
+  --brand-soft: #fff1f3;
+  --brand-softer: #fff7f8;
+  --brand-border: #ffc9d2;
+
+  /* 表面:浅暖灰底 + 白卡 */
   --surface: #ffffff;
-  --surface-muted: #f7f7f8;
-  --text: #171717;
-  --text-muted: #52525b;
-  --border: rgba(23, 23, 23, 0.12);
-  --radius: 8px;
-  --radius-card: 12px;
-  --radius-full: 999px;
+  --surface-subtle: #f6f6f7;
+  --surface-blue: #f7f8fa;
+
+  /* 文字:近黑 + 中性灰阶梯 */
+  --text: #121212;
+  --text-muted: #6e6d7a;
+  --text-soft: #9a9aa3;
+
+  /* 分割线 */
+  --border: #ebebeb;
+  --border-light: #f2f2f3;
+
+  --danger: #d92d20;
+  --success: #067647;
+  --success-soft: #ecfdf3;
+
+  /* 圆角语言:卡片 12,容器 16,按钮胶囊 */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-pill: 999px;
+
+  /* 柔和投影,无玻璃拟态 */
+  --shadow-sm: 0 1px 2px rgba(18, 18, 18, .04), 0 4px 16px rgba(18, 18, 18, .04);
+  --shadow-md: 0 8px 28px rgba(18, 18, 18, .10);
+
+  color-scheme: light;
 }
 
-* {
-  box-sizing: border-box;
+/* 夜间模式:同构色阶,品牌红略提亮 */
+[data-theme="dark"] {
+  color: #e8e8ea;
+  background: #121213;
+
+  --brand: #ff3b57;
+  --brand-hover: #ff5c71;
+  --brand-dark: #ff8a9a;
+  --brand-soft: rgba(255, 59, 87, .16);
+  --brand-softer: rgba(255, 59, 87, .08);
+  --brand-border: rgba(255, 59, 87, .42);
+
+  --surface: #1b1b1e;
+  --surface-subtle: #121213;
+  --surface-blue: #1e1e22;
+
+  --text: #e8e8ea;
+  --text-muted: #a2a2ab;
+  --text-soft: #6d6d76;
+
+  --border: #2e2e33;
+  --border-light: #26262a;
+
+  --danger: #f97066;
+  --success: #47cd89;
+  --success-soft: rgba(71, 205, 137, .14);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .30), 0 4px 16px rgba(0, 0, 0, .25);
+  --shadow-md: 0 8px 28px rgba(0, 0, 0, .45);
+
+  color-scheme: dark;
 }
 
-body {
-  margin: 0;
-  font-family: "SF Pro Text", "PingFang SC", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  font-size: 14px;
-  line-height: 20px;
-  color: var(--text);
-  background: var(--surface-muted);
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--surface-subtle); color: var(--text); font-size: 14px; line-height: 1.55; transition: background-color .2s ease, color .2s ease; }
+button, input, textarea { font: inherit; }
+button, a { -webkit-tap-highlight-color: transparent; }
+button { cursor: pointer; }
+a { color: inherit; text-decoration: none; }
+img { max-width: 100%; display: block; }
+::selection { color: #fff; background: var(--brand); }
+
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+.srOnly {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 200;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
 }
 
-a {
-  color: inherit;
-  text-decoration: none;
+.srOnly:focus {
+  width: auto;
+  height: auto;
+  padding: 10px 14px;
+  clip: auto;
+  border-radius: var(--r-sm);
+  color: #fff;
+  background: var(--brand);
 }
 
-button {
-  font-family: inherit;
-  cursor: pointer;
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }

@@ -1,0 +1,39 @@
+# xsnbb 一体化部署镜像：前端构建 → 后端构建 → 单进程运行
+# 构建:docker build -f infra/Dockerfile -t xsnbb .
+# 运行:docker run -p 8080:8080 -v xsnbb-data:/data xsnbb
+
+# ---- 阶段 1：构建两个前端 ----
+FROM node:22-alpine AS frontend
+WORKDIR /repo
+RUN corepack enable
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY apps/web/package.json apps/web/
+COPY apps/admin/package.json apps/admin/
+RUN pnpm install --frozen-lockfile
+COPY apps ./apps
+RUN pnpm -r build
+
+# ---- 阶段 2：构建 Go 后端 ----
+FROM golang:1.24-alpine AS backend
+WORKDIR /repo
+COPY server/go.mod server/go.sum ./server/
+RUN cd server && go mod download
+COPY server ./server
+RUN cd server && CGO_ENABLED=0 go build -trimpath -o /xsnbb-api ./cmd/api
+
+# ---- 阶段 3：运行镜像 ----
+FROM alpine:3.20
+RUN adduser -D xsnbb && mkdir -p /data/uploads && chown xsnbb /data/uploads
+WORKDIR /app
+COPY --from=backend /xsnbb-api /app/xsnbb-api
+COPY --from=frontend /repo/apps/web/dist /app/web/dist
+COPY --from=frontend /repo/apps/admin/dist /app/admin/dist
+USER xsnbb
+ENV APP_ENV=prod \
+    HTTP_ADDR=:8080 \
+    WEB_DIST=/app/web/dist \
+    ADMIN_DIST=/app/admin/dist \
+    UPLOAD_DIR=/data/uploads
+EXPOSE 8080
+# 生产运行时通过环境变量注入:SESSION_SECRET / SUPER_ADMIN_* / SMS_* / OSS_* / SEARCH_*
+CMD ["/app/xsnbb-api"]

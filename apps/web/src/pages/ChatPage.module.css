@@ -1,0 +1,53 @@
+.chatShell { min-height: calc(100vh - 112px); display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow-sm); }
+
+.chatHead { min-height: 60px; padding: 10px 16px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.chatHead > button { width: 34px; height: 34px; flex: 0 0 auto; padding: 0; display: grid; place-items: center; border: 0; border-radius: 50%; background: transparent; color: var(--text-muted); }
+.chatHead > button:hover { background: var(--surface-subtle); color: var(--text); }
+.chatHead > button svg { width: 18px; }
+.chatHead > div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.chatHead strong { font-size: 15px; font-weight: 600; }
+.chatHead small { color: var(--text-soft); font-size: 12px; }
+
+.avatar { width: 36px; height: 36px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 50%; color: var(--brand-dark); background: var(--brand-soft); font-size: 13px; font-weight: 600; }
+
+.chatMenu { padding: 12px 16px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border-light); background: var(--surface-subtle); }
+.chatMenu p { margin: 0; color: var(--text-soft); font-size: 12px; }
+
+.privacyNote { padding: 8px 16px; display: flex; align-items: center; justify-content: center; gap: 6px; border-bottom: 1px solid var(--border-light); color: var(--text-soft); background: var(--surface-subtle); font-size: 12px; }
+.privacyNote svg { width: 13px; }
+
+.messages { min-height: 380px; padding: 20px; flex: 1; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; background: var(--surface-subtle); }
+
+.messageRow { display: flex; align-items: flex-end; gap: 8px; }
+.messageRow > div { max-width: 70%; display: flex; flex-direction: column; align-items: flex-start; }
+.messageRow p { margin: 0; padding: 10px 14px; border-radius: var(--r-lg) var(--r-lg) var(--r-lg) 4px; background: var(--surface); color: var(--text); font-size: 14px; line-height: 1.6; box-shadow: var(--shadow-sm); }
+.messageRow small { margin-top: 4px; color: var(--text-soft); font-size: 12px; }
+.messageRow time { display: block; margin-top: 4px; color: var(--text-soft); font-size: 12px; }
+
+.mine { justify-content: flex-end; }
+.mine > div { align-items: flex-end; }
+.mine p { border-radius: var(--r-lg) var(--r-lg) 4px var(--r-lg); color: #fff; background: var(--brand); box-shadow: none; }
+.mine small { color: var(--text-soft); }
+
+.handshake { margin: 16px; padding: 16px; display: grid; grid-template-columns: 32px 1fr auto; align-items: center; gap: 12px; border: 1px solid var(--brand-border); border-radius: var(--r-md); background: var(--brand-softer); }
+.handshake > svg { width: 22px; color: var(--brand); }
+.handshake strong { font-size: 14px; font-weight: 600; }
+.handshake p { margin: 2px 0 0; color: var(--text-muted); font-size: 12px; }
+.handshake button { padding: 8px 16px; border: 0; border-radius: var(--r-pill); color: #fff; background: var(--brand); font-size: 13px; font-weight: 600; }
+.handshake button:hover { background: var(--brand-hover); }
+.handshake button:disabled { opacity: .5; }
+
+.composer { position: sticky; bottom: 0; padding: 12px 16px; display: flex; align-items: flex-end; gap: 10px; border-top: 1px solid var(--border-light); background: var(--surface); }
+.composer textarea { flex: 1; min-height: 40px; max-height: 120px; padding: 9px 16px; resize: none; border: 1px solid transparent; border-radius: 20px; outline: 0; background: var(--surface-subtle); font-size: 14px; line-height: 1.5; }
+.composer textarea:focus { border-color: var(--brand); background: var(--surface); }
+.composer > button { width: 40px; height: 40px; flex: 0 0 auto; padding: 0; display: grid; place-items: center; border: 0; border-radius: 50%; color: #fff; background: var(--brand); }
+.composer > button:hover { background: var(--brand-hover); }
+.composer > button:disabled { opacity: .4; }
+.composer svg { width: 17px; }
+
+@media (max-width: 720px) {
+  .chatShell { min-height: calc(100vh - 92px); margin: -4px -1px 0; border-radius: var(--r-md); }
+  .messageRow > div { max-width: 78%; }
+  .handshake { grid-template-columns: 28px 1fr; }
+  .handshake button { grid-column: 1 / -1; }
+}

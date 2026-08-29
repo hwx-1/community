@@ -1,0 +1,144 @@
+/* 设置页通用:居中窄栏 + 白卡 + 知乎式干净表单 */
+.accountPage { width: min(100%, 640px); margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+
+/* 页头:返回 + 标题 */
+.pageHead { min-height: 54px; display: grid; grid-template-columns: 38px 1fr; align-items: center; gap: 10px; }
+.pageHead > button, .publicHead button { width: 36px; height: 36px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 50%; color: var(--text-muted); background: var(--surface); box-shadow: var(--shadow-sm); }
+.pageHead > button:hover, .publicHead button:hover { color: var(--brand); }
+.pageHead > button svg, .publicHead button svg { width: 18px; }
+.pageHead h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
+.pageHead p { margin: 2px 0 0; color: var(--text-muted); font-size: 13px; }
+
+/* 成功提示 */
+/* 成功绿:无 --success 令牌,深浅主题沿用同一组状态色(后续可在 global.css 增补 --success/--success-soft 后替换) */
+.successNotice, .inlineSuccess { padding: 10px 14px; display: flex; align-items: center; gap: 7px; border-radius: var(--r-sm); color: var(--success); background: var(--success-soft); font-size: 13px; }
+.successNotice svg, .inlineSuccess svg { width: 15px; }
+.inlineSuccess { margin-bottom: 12px; }
+
+/* 白卡 */
+.formCard, .statusCard, .ruleCard { padding: 24px; border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow-sm); }
+.formCard h2, .ruleCard h2 { margin: 0 0 16px; font-size: 15px; font-weight: 600; }
+
+/* 表单语言:label 13px 浅灰,输入大圆角灰底,focus 白底红边 */
+.formCard > label, .formCard .twoCol label { margin: 14px 0 7px; display: flex; align-items: center; justify-content: space-between; color: var(--text-muted); font-size: 13px; font-weight: 500; }
+.formCard label > span { color: var(--text-soft); font-size: 12px; font-weight: 400; }
+.formCard input, .formCard select, .formCard textarea { width: 100%; min-height: 44px; padding: 10px 14px; border: 1px solid transparent; border-radius: var(--r-md); outline: 0; background: var(--surface-subtle); font-size: 14px; transition: border-color .15s, background .15s, box-shadow .15s; }
+.formCard textarea { min-height: 96px; resize: vertical; }
+.formCard input::placeholder, .formCard textarea::placeholder { color: var(--text-soft); }
+.formCard input:focus, .formCard select:focus, .formCard textarea:focus { border-color: var(--brand); background: var(--surface); box-shadow: 0 0 0 3px var(--brand-soft); }
+.formCard input:disabled { color: var(--text-soft); background: var(--surface-subtle); }
+.twoCol { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+/* 头像编辑 */
+.avatarEditor { margin-bottom: 18px; padding-bottom: 18px; display: flex; align-items: center; gap: 14px; border-bottom: 1px solid var(--border-light); }
+.avatarEditor > span { width: 64px; height: 64px; display: grid; place-items: center; overflow: hidden; border-radius: 50%; color: var(--brand-dark); background: var(--brand-soft); font-size: 20px; font-weight: 700; }
+.avatarEditor > span img { width: 100%; height: 100%; object-fit: cover; }
+.avatarEditor > div { display: flex; flex-direction: column; align-items: flex-start; }
+.avatarEditor strong { font-size: 13px; }
+.avatarEditor small { margin-top: 2px; color: var(--text-soft); font-size: 12px; }
+.avatarEditor button { margin-top: 8px; height: 30px; padding: 0 14px; border: 1px solid var(--border); border-radius: var(--r-pill); color: var(--text); background: var(--surface); font-size: 12px; font-weight: 600; }
+.avatarEditor button:hover { border-color: var(--brand); color: var(--brand); }
+.lockLabel { display: inline-flex !important; align-items: center; gap: 4px; }
+.lockLabel svg { width: 11px; }
+.sectionNote { margin: -8px 0 12px; color: var(--text-muted); font-size: 13px; }
+
+/* 按钮:主操作红胶囊,次操作白底灰边胶囊 */
+.primaryButton { width: 100%; min-height: 44px; padding: 0 20px; display: flex; align-items: center; justify-content: center; gap: 6px; border: 0; border-radius: var(--r-pill); color: #fff; background: var(--brand); font-size: 14px; font-weight: 600; }
+.primaryButton:hover { background: var(--brand-hover); }
+.primaryButton:disabled { cursor: not-allowed; opacity: .5; }
+.formCard > .primaryButton { margin-top: 18px; }
+.secondaryButton { min-height: 36px; margin-top: 12px; padding: 0 16px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: var(--r-pill); color: var(--text); background: var(--surface); font-size: 13px; font-weight: 600; }
+.secondaryButton:hover { border-color: var(--brand); color: var(--brand); }
+.secondaryButton:disabled { cursor: not-allowed; opacity: .5; }
+
+/* 认证状态卡:待审=浅灰,通过=红章,拒绝=danger */
+.statusCard { display: flex; align-items: center; gap: 14px; }
+.statusCard > span { width: 48px; height: 48px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 50%; color: var(--text-soft); background: var(--surface-subtle); }
+.statusCard > span svg { width: 22px; }
+.statusCard small { color: var(--text-soft); font-size: 12px; }
+.statusCard h2 { margin: 2px 0; font-size: 17px; font-weight: 700; }
+.statusCard p { margin: 0; color: var(--text-muted); font-size: 12px; }
+.statusApproved > span { color: var(--brand); background: var(--brand-soft); }
+.statusApproved small { color: var(--brand); }
+.statusRejected > span { color: var(--danger); background: var(--brand-soft); }
+.statusRejected small { color: var(--danger); }
+
+/* 上传与隐私说明 */
+.uploadBox { min-height: 120px; padding: 16px; display: flex !important; flex-direction: column; align-items: center !important; justify-content: center !important; border: 1px dashed var(--border); border-radius: var(--r-md); background: var(--surface-subtle); cursor: pointer; }
+.uploadBox:hover { border-color: var(--brand); }
+.uploadBox svg { width: 24px; color: var(--brand); }
+.uploadBox strong { margin-top: 6px; font-size: 13px; }
+.uploadBox small { margin-top: 2px; color: var(--text-soft); font-size: 12px; font-weight: 400; text-align: center; }
+.privacyBox { margin-top: 14px; padding: 12px 14px; display: flex; gap: 9px; border-radius: var(--r-md); background: var(--brand-soft); }
+.privacyBox > svg { width: 16px; flex: 0 0 auto; margin-top: 2px; color: var(--brand); }
+.privacyBox p { margin: 0; display: flex; flex-direction: column; }
+.privacyBox strong { color: var(--brand-dark); font-size: 12px; }
+.privacyBox span { margin-top: 2px; color: var(--text-muted); font-size: 12px; }
+
+/* 提交成功 */
+.submitted { padding: 40px 28px; display: flex; flex-direction: column; align-items: center; border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow-sm); text-align: center; }
+.submitted > svg { width: 30px; color: var(--brand); }
+.submitted h2 { margin: 12px 0 4px; font-size: 18px; font-weight: 700; }
+.submitted p { margin: 0; color: var(--text-muted); font-size: 13px; }
+.submitted button { margin-top: 18px; height: 38px; padding: 0 20px; border: 0; border-radius: var(--r-pill); color: #fff; background: var(--brand); font-size: 13px; font-weight: 600; }
+.submitted button:hover { background: var(--brand-hover); }
+
+/* 认证说明 */
+.ruleCard ul { margin: 0; padding-left: 18px; color: var(--text-muted); font-size: 13px; line-height: 2; }
+
+/* 会话行(预留) */
+.sessionRow { padding: 12px 0; display: grid; grid-template-columns: 28px 1fr auto; align-items: center; gap: 10px; border-top: 1px solid var(--border-light); border-bottom: 1px solid var(--border-light); }
+.sessionRow > svg { width: 18px; color: var(--brand); }
+.sessionRow div { display: flex; flex-direction: column; }
+.sessionRow strong { font-size: 13px; }
+.sessionRow small { color: var(--text-soft); font-size: 12px; }
+.sessionRow > span { color: var(--success); font-size: 12px; }
+
+/* 危险区:红色文字按钮 */
+.dangerCard h2 { color: var(--danger); }
+.dangerCard > button { height: 36px; padding: 0 16px; border: 0; border-radius: var(--r-pill); color: var(--danger); background: var(--brand-soft); font-size: 13px; font-weight: 600; }
+.dangerCard > button:hover { background: var(--brand-border); }
+.deleteConfirm { margin-top: 14px; padding: 14px; display: flex; gap: 10px; border-radius: var(--r-md); background: var(--brand-soft); }
+.deleteConfirm > svg { width: 18px; flex: 0 0 auto; margin-top: 2px; color: var(--danger); }
+.deleteConfirm strong { font-size: 13px; }
+.deleteConfirm p { margin: 4px 0 10px; color: var(--text-muted); font-size: 12px; }
+.deleteConfirm div div { display: flex; gap: 8px; }
+.deleteConfirm button { height: 32px; padding: 0 14px; border: 1px solid var(--border); border-radius: var(--r-pill); background: var(--surface); font-size: 12px; font-weight: 600; }
+.deleteConfirm button:last-child { color: #fff; border-color: var(--danger); background: var(--danger); }
+
+/* 公开主页 */
+.publicHead { min-height: 46px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
+.publicHead span { font-size: 15px; font-weight: 600; }
+.publicHead button:last-child { justify-self: end; }
+.publicProfile { padding: 24px; display: grid; grid-template-columns: 80px 1fr auto; align-items: center; gap: 18px; border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow-sm); }
+.publicAvatar { width: 80px; height: 80px; display: grid; place-items: center; border-radius: 50%; color: var(--brand-dark); background: var(--brand-soft); font-size: 26px; font-weight: 700; }
+.publicProfile > div:nth-child(2) > div { display: flex; align-items: center; gap: 8px; }
+.publicProfile h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
+.publicProfile > div:nth-child(2) span { padding: 3px 9px; display: inline-flex; align-items: center; gap: 3px; border-radius: var(--r-pill); color: var(--brand); background: var(--brand-soft); font-size: 11px; font-weight: 600; }
+.publicProfile span svg { width: 11px; }
+.publicProfile p { margin: 5px 0 0; color: var(--text-muted); font-size: 13px; }
+.publicProfile small { color: var(--text-soft); font-size: 12px; }
+.publicTitle { margin: 8px 2px -4px; display: flex; align-items: center; justify-content: space-between; }
+.publicTitle h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.publicTitle h2::after { content: ''; display: block; width: 24px; height: 3px; margin-top: 4px; border-radius: 2px; background: var(--brand); }
+.publicTitle span { color: var(--text-soft); font-size: 12px; }
+.publicEmpty { min-height: 160px; display: flex; align-items: center; justify-content: center; gap: 7px; border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow-sm); color: var(--text-soft); font-size: 13px; }
+.publicEmpty svg { width: 18px; }
+.userPosts { display: flex; flex-direction: column; gap: 12px; }
+.publicActions { display: flex; flex-direction: column; gap: 8px; }
+.publicActions button { height: 36px; padding: 0 18px; display: flex; align-items: center; justify-content: center; gap: 6px; border: 0; border-radius: var(--r-pill); color: #fff; background: var(--brand); font-size: 13px; font-weight: 600; }
+.publicActions button:hover { background: var(--brand-hover); }
+.publicActions button svg { width: 14px; }
+.publicActions button:disabled { cursor: not-allowed; opacity: .5; }
+.publicActions .publicReport { color: var(--text); border: 1px solid var(--border); background: var(--surface); }
+.publicActions .publicReport:hover { color: var(--brand); border-color: var(--brand); background: var(--surface); }
+
+@media (max-width: 520px) {
+  .formCard, .statusCard, .ruleCard { padding: 18px; }
+  .twoCol { grid-template-columns: 1fr; gap: 0; }
+  .publicProfile { grid-template-columns: 64px 1fr; padding: 18px; gap: 14px; }
+  .publicAvatar { width: 64px; height: 64px; font-size: 21px; }
+  .publicProfile > button, .publicActions { grid-column: 1 / -1; }
+  .publicActions { flex-direction: row; }
+  .publicActions button { flex: 1; }
+}

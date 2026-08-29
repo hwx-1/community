@@ -6,6 +6,8 @@
   "scripts": {
     "dev:web": "pnpm --filter @xsnbb/web dev",
     "dev:admin": "pnpm --filter @xsnbb/admin dev",
+    "dev:server": "go -C server run ./cmd/api",
+    "test:server": "go -C server test ./...",
     "build": "pnpm -r build"
   }
 }

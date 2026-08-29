@@ -1,0 +1,71 @@
+/* 引导页:居中卡片 + 步骤指示 + 统一表单语言 */
+.shell { min-height: 100vh; padding: 36px 20px; display: flex; flex-direction: column; align-items: center; background: var(--surface-subtle); }
+.shell > header { width: min(100%, 640px); display: flex; align-items: center; gap: 9px; }
+.brandMark { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px; color: #fff; background: var(--brand); font-weight: 800; }
+.shell > header strong { font-size: 17px; font-weight: 750; }
+.shell > header small { margin-left: auto; color: var(--text-soft); font-size: 12px; }
+
+/* 步骤指示:当前步红点,其余浅灰 */
+.progress { width: 200px; margin: 34px 0 20px; display: flex; align-items: center; }
+.progress span { width: 26px; height: 26px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 50%; color: var(--text-soft); background: var(--surface); font-size: 11px; font-weight: 600; }
+.progress i { height: 2px; flex: 1; background: var(--border); }
+.progress span.done { border-color: var(--brand); color: #fff; background: var(--brand); }
+.progress i.lineDone { background: var(--brand); }
+
+/* 白卡 */
+.card { width: min(100%, 640px); padding: 28px; display: flex; flex-direction: column; border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow-sm); }
+.title { margin-bottom: 20px; display: flex; align-items: flex-start; gap: 12px; }
+.title > span { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px; color: var(--brand); background: var(--brand-soft); font-size: 11px; font-weight: 700; }
+.title h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
+.title p { margin: 4px 0 0; color: var(--text-muted); font-size: 13px; }
+
+/* 表单:label 13px 浅灰,输入大圆角灰底,focus 白底红边 */
+.card > label, .twoCol label { margin: 14px 0 7px; display: flex; justify-content: space-between; color: var(--text-muted); font-size: 13px; font-weight: 500; }
+.card label span { color: var(--text-soft); font-size: 12px; font-weight: 400; }
+.card > input, .card > select, .twoCol input, .twoCol select { width: 100%; min-height: 44px; padding: 10px 14px; border: 1px solid transparent; border-radius: var(--r-md); outline: 0; background: var(--surface-subtle); font-size: 14px; transition: border-color .15s, background .15s, box-shadow .15s; }
+.card input::placeholder { color: var(--text-soft); }
+.card input:focus, .card select:focus { border-color: var(--brand); background: var(--surface); box-shadow: 0 0 0 3px var(--brand-soft); }
+.twoCol { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+/* 上传控件 */
+.avatarUpload { width: 108px; height: 40px; margin-top: 0 !important; display: flex !important; align-items: center; justify-content: center !important; gap: 6px; border: 1px dashed var(--border); border-radius: var(--r-pill); color: var(--brand); background: var(--surface-subtle); font-size: 13px; cursor: pointer; }
+.avatarUpload:hover { border-color: var(--brand); }
+.avatarUpload svg { width: 15px; }
+.proofUpload { min-height: 150px; margin-top: 0 !important; padding: 18px; display: flex !important; flex-direction: column; align-items: center; justify-content: center !important; border: 1px dashed var(--border); border-radius: var(--r-md); background: var(--surface-subtle); cursor: pointer; }
+.proofUpload:hover { border-color: var(--brand); }
+.proofUpload svg { width: 26px; color: var(--brand); }
+.proofUpload strong { margin-top: 7px; font-size: 13px; }
+.proofUpload small { margin-top: 2px; color: var(--text-soft); font-size: 12px; font-weight: 400; }
+
+/* 按钮:主操作红胶囊,上一步白底灰边胶囊 */
+.card > button, .actions button, .success > button { height: 44px; margin-top: 22px; display: flex; align-items: center; justify-content: center; gap: 6px; border: 0; border-radius: var(--r-pill); color: #fff; background: var(--brand); font-size: 14px; font-weight: 600; }
+.card > button:hover, .actions button:hover, .success > button:hover { background: var(--brand-hover); }
+.card > button:disabled, .actions button:disabled { cursor: not-allowed; opacity: .5; }
+.card > button svg, .actions button svg { width: 15px; }
+.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.actions button:first-child { color: var(--text); border: 1px solid var(--border); background: var(--surface); }
+.actions button:first-child:hover { border-color: var(--brand); color: var(--brand); background: var(--surface); }
+
+/* 隐私说明 */
+.privacy { margin-top: 14px; padding: 12px 14px; display: flex; gap: 9px; border-radius: var(--r-md); background: var(--brand-soft); }
+.privacy > svg { width: 16px; flex: 0 0 auto; margin-top: 2px; color: var(--brand); }
+.privacy p { margin: 0; display: flex; flex-direction: column; }
+.privacy strong { color: var(--brand-dark); font-size: 12px; }
+.privacy span { margin-top: 2px; color: var(--text-muted); font-size: 12px; }
+
+/* 完成态 */
+.success { padding-top: 46px; padding-bottom: 46px; align-items: center; text-align: center; }
+.success > span { width: 56px; height: 56px; display: grid; place-items: center; border-radius: 50%; color: var(--brand); background: var(--brand-soft); }
+.success > span svg { width: 26px; }
+.success h1 { margin: 16px 0 6px; font-size: 20px; font-weight: 700; }
+.success p { max-width: 460px; margin: 0; color: var(--text-muted); font-size: 13px; }
+.success > button { width: 160px; }
+
+.shell > footer { margin-top: 22px; color: var(--text-soft); font-size: 12px; }
+
+@media (max-width: 560px) {
+  .shell { padding: 24px 14px; }
+  .card { padding: 22px 18px; }
+  .twoCol { grid-template-columns: 1fr; gap: 0; }
+  .title h1 { font-size: 18px; }
+}

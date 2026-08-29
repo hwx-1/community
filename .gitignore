@@ -3,3 +3,12 @@ dist/
 .env
 *.log
 .DS_Store
+*.zip
+*.tsbuildinfo
+xsnbb-web-server-db/
+server/uploads/
+server/xsnbb-api
+server/xsnbb-api.pid
+server/xsnbb-api.log
+server/.prod.pid
+server/xsnbb.log

@@ -1,0 +1,73 @@
+/* 知乎式阅读页:居中阅读栏 + 白卡评论区 */
+.page { width: 100%; max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+
+/* 页头工具行:轻量文字按钮,不做厚重 header 卡 */
+.pageHead { min-height: 32px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
+.pageHead > span { color: var(--text-soft); font-size: 13px; font-weight: 500; }
+.pageHead button { padding: 6px 2px; display: inline-flex; align-items: center; gap: 5px; border: 0; background: transparent; color: var(--text-muted); font-size: 13px; }
+.pageHead button:first-child { justify-self: start; }
+.pageHead button:last-child { justify-self: end; }
+.pageHead button:hover { color: var(--brand); }
+.pageHead svg { width: 15px; }
+
+/* 举报面板:白卡 + 胶囊原因按钮 */
+.reportBox { padding: 16px 18px; display: flex; gap: 12px; border-radius: var(--r-md); background: var(--surface); box-shadow: var(--shadow-sm); }
+.reportBox > svg { width: 20px; flex: 0 0 auto; margin-top: 2px; color: var(--brand); }
+.reportBox strong { font-size: 14px; }
+.reportBox p { margin: 4px 0 10px; color: var(--text-muted); font-size: 13px; line-height: 1.6; }
+.reportBox div > p:last-child { margin-bottom: 0; }
+.reportActions { display: flex; flex-wrap: wrap; gap: 8px; }
+.reportActions button { height: 30px; padding: 0 14px; border: 1px solid var(--border); border-radius: var(--r-pill); background: var(--surface); color: var(--text-muted); font-size: 13px; }
+.reportActions button:hover { border-color: var(--brand); color: var(--brand); }
+
+/* 评论输入区:头像 + 灰底圆角 textarea + 红色胶囊提交 */
+.commentComposer { padding: 18px 20px; display: flex; align-items: flex-start; gap: 12px; border-radius: var(--r-md); background: var(--surface); box-shadow: var(--shadow-sm); }
+.avatar { width: 38px; height: 38px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 50%; color: var(--brand); background: var(--brand-soft); font-size: 13px; font-weight: 700; }
+.commentComposer form { min-width: 0; flex: 1; }
+.commentComposer label { display: block; margin-bottom: 8px; font-size: 14px; font-weight: 600; }
+.commentComposer textarea { width: 100%; min-height: 88px; padding: 12px 14px; resize: vertical; border: 1px solid transparent; border-radius: var(--r-md); outline: 0; background: var(--surface-subtle); font-size: 14px; line-height: 1.6; }
+.commentComposer textarea:focus { border-color: var(--brand); background: var(--surface); box-shadow: 0 0 0 3px var(--brand-soft); }
+.commentComposer textarea::placeholder { color: var(--text-soft); }
+.composerFoot { margin-top: 10px; display: flex; align-items: center; }
+.composerFoot span { color: var(--text-soft); font-size: 12px; }
+.composerFoot button { margin-left: auto; height: 32px; padding: 0 18px; border: 0; border-radius: var(--r-pill); color: #fff; background: var(--brand); font-size: 13px; font-weight: 600; }
+.composerFoot button:hover:not(:disabled) { background: var(--brand-hover); }
+.composerFoot button:disabled { cursor: not-allowed; opacity: .4; }
+
+/* 评论列表:白卡,细分隔线 */
+.comments { overflow: hidden; border-radius: var(--r-md); background: var(--surface); box-shadow: var(--shadow-sm); }
+.comments > header { height: 54px; padding: 0 20px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border-light); }
+.comments h2 { margin: 0; font-size: 15px; }
+.comments header span { color: var(--text-soft); font-size: 12px; }
+.comment { padding: 18px 20px; display: flex; align-items: flex-start; gap: 12px; border-bottom: 1px solid var(--border-light); }
+.comment:last-child { border-bottom: 0; }
+.commentBody { min-width: 0; flex: 1; }
+.commentMeta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.commentMeta a, .commentMeta > strong { color: var(--text); font-size: 13px; font-weight: 600; }
+.commentMeta a:hover { color: var(--brand); }
+.commentMeta > span { color: var(--text-soft); font-size: 12px; }
+.commentMeta em { padding: 2px 8px; border-radius: var(--r-pill); color: var(--brand); background: var(--brand-soft); font-size: 11px; font-style: normal; }
+.commentBody > p { margin: 6px 0; font-size: 15px; line-height: 1.7; }
+.deleted { color: var(--text-soft); }
+.commentActions { display: flex; gap: 14px; }
+.commentActions button { padding: 0; border: 0; background: transparent; color: var(--text-soft); font-size: 12px; }
+.commentActions button:hover { color: var(--brand); }
+.replies { margin-top: 10px; padding: 10px 12px; border-radius: var(--r-sm); background: var(--surface-subtle); }
+.replies p { margin: 4px 0; font-size: 13px; line-height: 1.6; }
+.replies strong { font-weight: 600; }
+.replies small { margin-left: 8px; color: var(--text-soft); font-size: 11px; }
+.replyClosed { display: flex; align-items: center; gap: 5px; margin-top: 6px; color: var(--text-soft); font-size: 11px; }
+.replyClosed svg { width: 12px; }
+
+/* 空态 */
+.notFound { min-height: 360px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-soft); text-align: center; }
+.notFound > svg { width: 34px; }
+.notFound h1 { margin: 14px 0; color: var(--text); font-size: 17px; }
+.notFound button { height: 36px; padding: 0 20px; border: 0; border-radius: var(--r-pill); color: #fff; background: var(--brand); font-size: 13px; font-weight: 600; }
+.notFound button:hover { background: var(--brand-hover); }
+
+@media (max-width: 520px) {
+  .commentComposer { padding: 14px; }
+  .commentComposer > .avatar { display: none; }
+  .comment { padding: 15px 14px; }
+}

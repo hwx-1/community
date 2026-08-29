@@ -1,0 +1,67 @@
+/* 个人主页:小红书式大白卡 + 统计行 + 选项卡 */
+.profileCard { padding: 24px; border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow-sm); }
+.profileTop { display: flex; align-items: center; gap: 18px; }
+.avatar { width: 80px; height: 80px; flex: 0 0 auto; display: grid; place-items: center; overflow: hidden; border-radius: 50%; color: var(--brand-dark); background: var(--brand-soft); font-size: 26px; font-weight: 700; }
+.profileMain { min-width: 0; flex: 1; }
+.nameLine { display: flex; align-items: center; gap: 8px; }
+.nameLine h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
+.nameLine span { padding: 3px 9px; display: inline-flex; align-items: center; gap: 3px; border-radius: var(--r-pill); color: var(--brand); background: var(--brand-soft); font-size: 11px; font-weight: 600; }
+.nameLine svg { width: 11px; }
+.profileMain p { margin: 5px 0 0; color: var(--text-muted); font-size: 13px; }
+.profileMain small { color: var(--text-soft); font-size: 12px; }
+.profileTop > button { height: 36px; padding: 0 16px; display: flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: var(--r-pill); background: var(--surface); color: var(--text); font-size: 13px; font-weight: 600; }
+.profileTop > button:hover { border-color: var(--brand); color: var(--brand); }
+.profileTop > button svg { width: 14px; }
+
+/* 统计数字区:融入用户卡底部 */
+.stats { margin-top: 18px; padding-top: 16px; display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--border-light); }
+.stats div { display: flex; align-items: baseline; gap: 6px; }
+.stats strong { font-size: 18px; font-weight: 700; }
+.stats span { color: var(--text-soft); font-size: 12px; }
+
+/* 内容卡:选项卡 + 帖子瀑布流 / 收藏列表 */
+.contentCard { overflow: hidden; border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow-sm); }
+.tabs { padding: 0 20px; display: flex; gap: 28px; border-bottom: 1px solid var(--border-light); }
+.tabs button { height: 48px; padding: 0 2px; display: inline-flex; align-items: center; gap: 6px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--text-muted); font-size: 15px; font-weight: 600; }
+.tabs button span { color: var(--text-soft); font-size: 12px; font-weight: 500; }
+.tabs button.active { border-bottom-color: var(--brand); color: var(--text); }
+.tabs button.active span { color: var(--brand); }
+.feed { padding: 16px 16px 0; display: flex; flex-direction: column; gap: 12px; }
+
+/* 收藏紧凑列表 */
+.contentItem { width: 100%; min-height: 72px; padding: 14px 20px; display: grid; grid-template-columns: auto 1fr 18px; align-items: center; gap: 12px; border: 0; background: var(--surface); color: inherit; text-align: left; }
+.contentItem:hover { background: var(--surface-subtle); }
+.contentItem + .contentItem { border-top: 1px solid var(--border-light); }
+.savedIcon { width: 34px; height: 34px; display: grid; place-items: center; border-radius: var(--r-sm); color: var(--brand); background: var(--brand-soft); }
+.savedIcon svg { width: 15px; }
+.contentItem div { min-width: 0; display: flex; flex-direction: column; }
+.contentItem strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.contentItem small { color: var(--text-soft); font-size: 11px; }
+.contentItem > svg { width: 16px; color: var(--text-soft); }
+
+/* 空态:居中浅灰 */
+.empty { min-height: 160px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-soft); }
+.empty svg { width: 24px; }
+.empty p { margin: 8px 0 0; font-size: 13px; }
+
+/* 更多设置菜单 */
+.settingsCard { overflow: hidden; border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow-sm); }
+.settingsCard h2 { margin: 0; padding: 16px 20px; border-bottom: 1px solid var(--border-light); font-size: 15px; font-weight: 600; }
+.settingsCard button { width: 100%; min-height: 58px; padding: 10px 20px; display: grid; grid-template-columns: 20px 1fr 16px; align-items: center; gap: 12px; border: 0; border-bottom: 1px solid var(--border-light); background: var(--surface); color: var(--text); text-align: left; }
+.settingsCard button:last-child { border-bottom: 0; }
+.settingsCard button:hover { background: var(--surface-subtle); }
+.settingsCard button > svg { width: 18px; color: var(--text-muted); }
+.settingsCard button > svg:last-child { width: 15px; color: var(--text-soft); }
+.settingsCard button span { display: flex; flex-direction: column; }
+.settingsCard button strong { font-size: 13px; font-weight: 600; }
+.settingsCard button small { color: var(--text-soft); font-size: 11px; }
+.settingsCard button.danger, .settingsCard button.danger > svg { color: var(--danger); }
+
+@media (max-width: 520px) {
+  .profileCard { padding: 18px; }
+  .profileTop { align-items: flex-start; flex-wrap: wrap; }
+  .avatar { width: 64px; height: 64px; font-size: 21px; }
+  .profileTop > button { width: 100%; justify-content: center; }
+  .nameLine { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .nameLine h1 { font-size: 18px; }
+}
