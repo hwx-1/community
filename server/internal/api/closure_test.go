@@ -60,6 +60,49 @@ func TestPerUserLikeAndBookmark(t *testing.T) {
 	}
 }
 
+// TestLikeNotification 点赞只在切换为已点赞时通知帖子作者；取消与自赞均不通知。
+func TestLikeNotification(t *testing.T) {
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	author := newClient(t, srv.URL) // 帖子 3 作者是账号 2
+	author.login(t, "13800000001", "Demo12345")
+	liker := newClient(t, srv.URL)
+	liker.login(t, "13800000002", "Demo12345")
+
+	status, body := liker.do(http.MethodPost, "/api/v1/posts/3/like", map[string]any{})
+	if status != http.StatusOK || body["post"].(map[string]any)["liked"] != true {
+		t.Fatalf("like failed: %d %v", status, body)
+	}
+
+	_, notifications := author.do(http.MethodGet, "/api/v1/me/notifications", nil)
+	items := notifications["items"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("post author should receive exactly 1 like notification, got %v", items)
+	}
+	item := items[0].(map[string]any)
+	if item["type"] != "like" || item["ref_type"] != "post" || item["ref_id"].(float64) != 3 {
+		t.Fatalf("unexpected like notification: %v", item)
+	}
+	if notifications["unread"].(float64) != 1 {
+		t.Fatalf("like notification should be unread: %v", notifications["unread"])
+	}
+
+	// 取消点赞不应再产生一条通知。
+	liker.do(http.MethodPost, "/api/v1/posts/3/like", map[string]any{})
+	_, notifications = author.do(http.MethodGet, "/api/v1/me/notifications", nil)
+	if len(notifications["items"].([]any)) != 1 {
+		t.Fatalf("unlike should not create a notification: %v", notifications["items"])
+	}
+
+	// 作者给自己的帖子点赞不应收到自通知。
+	author.do(http.MethodPost, "/api/v1/posts/3/like", map[string]any{})
+	_, notifications = author.do(http.MethodGet, "/api/v1/me/notifications", nil)
+	if len(notifications["items"].([]any)) != 1 {
+		t.Fatalf("self-like should not create a notification: %v", notifications["items"])
+	}
+}
+
 // TestCommentAndReplyNotifications 主评论通知帖子作者；回复只通知被回复者。
 func TestCommentAndReplyNotifications(t *testing.T) {
 	srv := newTestServer(t)
@@ -227,6 +270,8 @@ func TestChangePasswordAndDeleteAccount(t *testing.T) {
 
 	c := newClient(t, srv.URL)
 	c.login(t, "13800000002", "Demo12345")
+	otherDevice := newClient(t, srv.URL)
+	otherDevice.login(t, "13800000002", "Demo12345")
 
 	status, _ := c.do(http.MethodPost, "/api/v1/me/password", map[string]string{"current_password": "wrong-pass", "new_password": "NewPass123"})
 	if status != http.StatusUnprocessableEntity {
@@ -235,6 +280,12 @@ func TestChangePasswordAndDeleteAccount(t *testing.T) {
 	status, _ = c.do(http.MethodPost, "/api/v1/me/password", map[string]string{"current_password": "Demo12345", "new_password": "NewPass123"})
 	if status != http.StatusOK {
 		t.Fatalf("change password failed: %d", status)
+	}
+	if status, _ = c.do(http.MethodGet, "/api/v1/me", nil); status != http.StatusOK {
+		t.Fatalf("current session should remain active after password change, got %d", status)
+	}
+	if status, _ = otherDevice.do(http.MethodGet, "/api/v1/me", nil); status != http.StatusUnauthorized {
+		t.Fatalf("other device session should be revoked after password change, got %d", status)
 	}
 
 	// 旧密码失效，新密码可登录

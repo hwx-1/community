@@ -11,6 +11,7 @@
 .list > a:hover { background: var(--surface-subtle); }
 .list > a > span { width: 38px; height: 38px; display: grid; place-items: center; border-radius: var(--r-sm); color: var(--brand); background: var(--brand-soft); }
 .list > a > span svg { width: 18px; }
+.list > a > img { width: 38px; height: 38px; border-radius: var(--r-sm); object-fit: cover; }
 .list > a > div { min-width: 0; }
 .list strong { font-size: 15px; font-weight: 600; }
 .list p { margin: 3px 0; overflow: hidden; color: var(--text-muted); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
@@ -25,9 +26,14 @@
 .detail > span { margin-top: 26px; display: block; color: var(--brand); font-size: 11px; font-weight: 700; letter-spacing: .1em; }
 .detail h1 { margin: 8px 0 6px; font-size: 20px; font-weight: 700; letter-spacing: -.02em; }
 .detail time { color: var(--text-soft); font-size: 12px; }
+.cover { width: 100%; max-height: 420px; margin-top: 22px; display: block; border-radius: var(--r-md); object-fit: cover; background: var(--surface-subtle); }
 .articleBody { margin: 24px 0; padding: 22px 0; border-top: 1px solid var(--border-light); border-bottom: 1px solid var(--border-light); }
-.articleBody p { margin: 0 0 16px; color: var(--text); font-size: 16px; line-height: 1.75; }
+.articleBody p { margin: 0 0 16px; color: var(--text); font-size: 16px; line-height: 1.75; white-space: pre-wrap; word-break: break-word; }
+.articleBody .summary { color: var(--text-muted); font-size: 15px; font-weight: 600; }
 .articleBody p:last-child { margin-bottom: 0; }
+.action { width: fit-content; margin: -4px 0 20px; padding: 9px 14px; display: inline-flex; align-items: center; gap: 7px; border-radius: var(--r-sm); color: #fff; background: var(--brand); font-size: 14px; font-weight: 600; }
+.action:hover { color: #fff; filter: brightness(.96); }
+.action svg { width: 16px; height: 16px; }
 .detail footer { display: flex; align-items: center; gap: 7px; color: var(--text-soft); font-size: 12px; }
 .detail footer svg { width: 14px; flex: 0 0 auto; }
 

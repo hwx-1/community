@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
+  Alert,
   Button,
   Form,
+  Image,
   Input,
   Modal,
   Space,
   Switch,
   Table,
   Tag,
+  Upload,
   message,
 } from 'antd'
+import { DeleteOutlined, LinkOutlined, UploadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import { api } from '../api'
@@ -19,6 +23,9 @@ interface AnnouncementForm {
   title: string
   summary: string
   body: string
+  image_url: string
+  link_url: string
+  link_text: string
   published: boolean
 }
 
@@ -27,7 +34,10 @@ export default function Announcements() {
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<Announcement | 'new' | null>(null)
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [form] = Form.useForm<AnnouncementForm>()
+  const imageUrl = Form.useWatch('image_url', form)
+  const linkUrl = Form.useWatch('link_url', form)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -49,6 +59,9 @@ export default function Announcements() {
         title: '',
         summary: '',
         body: '',
+        image_url: '',
+        link_url: '',
+        link_text: '',
         published: false,
       })
     } else {
@@ -56,9 +69,34 @@ export default function Announcements() {
         title: record.title,
         summary: record.summary,
         body: record.body,
+        image_url: record.image_url ?? '',
+        link_url: record.link_url ?? '',
+        link_text: record.link_text ?? '',
         published: record.published,
       })
     }
+  }
+
+  const uploadImage = async (file: File) => {
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/heic'].includes(file.type) && !/\.(jpe?g|png|webp|heic)$/i.test(file.name)) {
+      message.error('仅支持 JPG、PNG、WebP 或 HEIC 图片')
+      return Upload.LIST_IGNORE
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      message.error('图片大小不能超过 5MB')
+      return Upload.LIST_IGNORE
+    }
+    setUploading(true)
+    try {
+      const result = await api.uploadAnnouncementImage(file)
+      form.setFieldValue('image_url', result.url)
+      message.success('图片上传成功')
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : '图片上传失败')
+    } finally {
+      setUploading(false)
+    }
+    return Upload.LIST_IGNORE
   }
 
   const submit = async () => {
@@ -82,7 +120,24 @@ export default function Announcements() {
   }
 
   const columns: ColumnsType<Announcement> = [
-    { title: '标题', dataIndex: 'title' },
+    {
+      title: '标题',
+      dataIndex: 'title',
+      render: (title: string, record) => (
+        <Space size={10}>
+          {record.image_url && (
+            <Image
+              src={record.image_url}
+              alt="公告配图"
+              width={42}
+              height={42}
+              style={{ objectFit: 'cover', borderRadius: 6 }}
+            />
+          )}
+          <span>{title}</span>
+        </Space>
+      ),
+    },
     { title: '摘要', dataIndex: 'summary', ellipsis: true },
     {
       title: '状态',
@@ -130,7 +185,7 @@ export default function Announcements() {
         confirmLoading={saving}
         onOk={submit}
         onCancel={() => setEditing(null)}
-        width={640}
+      width={720}
         destroyOnClose
       >
         <Form<AnnouncementForm> form={form} layout="vertical">
@@ -155,6 +210,55 @@ export default function Announcements() {
           >
             <Input.TextArea rows={6} />
           </Form.Item>
+          <Form.Item name="image_url" label="公告配图" extra="支持 JPG、PNG、WebP、HEIC，单张不超过 5MB。">
+            <Input type="hidden" />
+          </Form.Item>
+          <div className="announcement-image-editor">
+            {imageUrl ? (
+              <div className="announcement-image-preview">
+                <Image src={imageUrl} alt="公告配图预览" />
+                <Button
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={() => form.setFieldValue('image_url', '')}
+                >
+                  移除图片
+                </Button>
+              </div>
+            ) : (
+              <Upload
+                accept="image/jpeg,image/png,image/webp,image/heic,.heic"
+                showUploadList={false}
+                beforeUpload={uploadImage}
+              >
+                <Button icon={<UploadOutlined />} loading={uploading}>
+                  上传公告图片
+                </Button>
+              </Upload>
+            )}
+          </div>
+          <Form.Item
+            name="link_url"
+            label="点击链接（可选）"
+            rules={[{ type: 'url', message: '请输入完整的 http 或 https 链接' }]}
+          >
+            <Input prefix={<LinkOutlined />} placeholder="https://example.com/notice" />
+          </Form.Item>
+          {linkUrl && (
+            <Form.Item
+              name="link_text"
+              label="链接按钮文字"
+              rules={[{ max: 30, message: '最多 30 个字' }]}
+            >
+              <Input maxLength={30} placeholder="查看详情" />
+            </Form.Item>
+          )}
+          <Alert
+            type="info"
+            showIcon
+            message="设为发布后，公告会立即出现在 Web 和手机 App；保存为草稿则仅后台可见。"
+            style={{ marginBottom: 20 }}
+          />
           <Form.Item
             name="published"
             label="是否发布"

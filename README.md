@@ -1,16 +1,18 @@
 # 沈阳大学校园社区（xsnbb）· 本地运行指南
 
-仓库包含三个可运行部分：
+仓库包含四个可运行部分：
 
 | 部分 | 目录 | 技术 | 端口 |
 | --- | --- | --- | --- |
 | Go API | `server/` | Go + Gin（内存本地数据实现 + 外部服务适配层） | 8080 |
 | 社区 Web | `apps/web/` | React 18 + Vite + CSS Modules | 5173 |
 | 管理后台 | `apps/admin/` | React 18 + Vite + Ant Design 5 | 5174 |
+| iOS / Android App | `apps/mobile/` | React Native 0.87 + TypeScript | Metro 8081 |
+| HarmonyOS App | `apps/harmony/` | ArkTS + ArkUI（Stage 模型，API 12+） | — |
 
 ## 快速开始
 
-前置：Go 1.24+、Node 20+、pnpm（`corepack enable` 后即可用）。
+前置：Go 1.24+、Node 22.11+、pnpm（`corepack enable` 后即可用）。移动端还需要完整 Xcode（iOS）或 Android Studio + Android SDK（Android）。
 
 ```bash
 # 1. 安装前端依赖（web + admin）
@@ -27,6 +29,16 @@ corepack pnpm dev:web
 
 # 5. 另开终端，启动管理后台（:5174，/api 代理到 8080）
 corepack pnpm dev:admin
+
+# 6. 移动端：先启动 Metro，再从另一终端启动目标平台
+corepack pnpm dev:mobile
+corepack pnpm ios       # 需要完整 Xcode + CocoaPods
+corepack pnpm android   # 需要 Android SDK 与模拟器/真机
+
+# 7. 鸿蒙端：构建未签名 debug HAP（需已安装 DevEco Studio）
+corepack pnpm build:harmony
+# 然后用 DevEco Studio 打开 apps/harmony/ 运行到模拟器/真机，
+# 并把 AppConfig.ets 中的 API_BASE_URL 改为局域网 IP，详见 apps/harmony/README.md
 ```
 
 ## 内置账号（内存种子数据，重启即重置）
@@ -54,7 +66,8 @@ corepack pnpm dev:admin
 
 ```bash
 corepack pnpm test:server   # go test ./...（含短信边界、审核流、举报复核、禁言/封禁/申诉、注销等）
-corepack pnpm build         # web + admin 的 tsc + vite 构建
+corepack pnpm build         # web/admin 构建 + mobile TypeScript 检查
+corepack pnpm --filter @xsnbb/mobile test
 ```
 
 ## 数据说明

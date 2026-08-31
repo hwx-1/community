@@ -29,8 +29,8 @@ type Store struct {
 	AIConversations     map[int64]*Conversation
 	DirectConversations map[int64]*DirectConversation
 	AuditLogs           []AuditLog
-	AdminUser           string
-	AdminPasswordHash   string
+	Admins              map[string]*AdminAccount
+	AdminRoles          map[int64]*AdminRole
 
 	SMSCodes         map[string]*SMSCode // key: purpose + ":" + phone
 	Reports          map[int64]*Report
@@ -49,8 +49,12 @@ type Store struct {
 func NewStore(cfg *config.Config) *Store {
 	adminHash, _ := security.HashPassword(cfg.SuperAdminPassword)
 	demoHash, _ := security.HashPassword("Demo12345")
-	s := &Store{nextID: 100, Accounts: map[int64]*Account{}, Phones: map[string]int64{}, Sessions: map[string]int64{}, AdminSessions: map[string]string{}, Posts: map[int64]*Post{}, Comments: map[int64]*Comment{}, Verifications: map[int64]*Verification{}, Announcements: map[int64]*Announcement{}, Tools: map[int64]*Tool{}, Providers: map[int64]*AIProvider{}, AIConversations: map[int64]*Conversation{}, DirectConversations: map[int64]*DirectConversation{}, SMSCodes: map[string]*SMSCode{}, Reports: map[int64]*Report{}, KBEntries: map[int64]*KBEntry{}, PendingQuestions: map[int64]*PendingQuestion{}, PostLikes: map[int64]map[int64]bool{}, PostBookmarks: map[int64]map[int64]bool{}, Notifications: map[int64]*Notification{}, Punishments: map[int64]*Punishment{}, Appeals: map[int64]*Appeal{}, Settings: Settings{Greeting: "你好，我想和你聊聊", HotTopics: []string{"期末复习", "羽毛球", "食堂新品"}}, AdminUser: cfg.SuperAdminUser, AdminPasswordHash: adminHash}
+	s := &Store{nextID: 100, Accounts: map[int64]*Account{}, Phones: map[string]int64{}, Sessions: map[string]int64{}, AdminSessions: map[string]string{}, Posts: map[int64]*Post{}, Comments: map[int64]*Comment{}, Verifications: map[int64]*Verification{}, Announcements: map[int64]*Announcement{}, Tools: map[int64]*Tool{}, Providers: map[int64]*AIProvider{}, AIConversations: map[int64]*Conversation{}, DirectConversations: map[int64]*DirectConversation{}, SMSCodes: map[string]*SMSCode{}, Reports: map[int64]*Report{}, KBEntries: map[int64]*KBEntry{}, PendingQuestions: map[int64]*PendingQuestion{}, PostLikes: map[int64]map[int64]bool{}, PostBookmarks: map[int64]map[int64]bool{}, Notifications: map[int64]*Notification{}, Punishments: map[int64]*Punishment{}, Appeals: map[int64]*Appeal{}, Settings: Settings{Greeting: "你好，我想和你聊聊", HotTopics: []string{"期末复习", "羽毛球", "食堂新品"}}, Admins: map[string]*AdminAccount{}, AdminRoles: map[int64]*AdminRole{}}
 	now := time.Now()
+	s.AdminRoles[1] = &AdminRole{ID: 1, Name: "超级管理员", Permissions: []string{"*"}, Protected: true, CreatedAt: now, UpdatedAt: now}
+	s.AdminRoles[2] = &AdminRole{ID: 2, Name: "认证审核", Permissions: []string{"verification.review", "profile.private.read"}, CreatedAt: now, UpdatedAt: now}
+	s.AdminRoles[3] = &AdminRole{ID: 3, Name: "内容与举报审核", Permissions: []string{"post.moderate", "comment.moderate", "report.review", "appeal.review"}, CreatedAt: now, UpdatedAt: now}
+	s.Admins[cfg.SuperAdminUser] = &AdminAccount{ID: 1, Username: cfg.SuperAdminUser, PasswordHash: adminHash, IsSuper: true, RoleIDs: []int64{1}, Enabled: true, CreatedAt: now, UpdatedAt: now}
 	s.Accounts[1] = &Account{ID: 1, Phone: "13800000000", PasswordHash: demoHash, Nickname: "李大壮", Avatar: "李", Gender: "男", RealName: "李同学", StudentNo: "2023000042", ClassName: "计算机 2301 班", ProfileDone: true, Verified: true, Status: "active", CreatedAt: now.AddDate(0, 0, -23)}
 	s.Accounts[2] = &Account{ID: 2, Phone: "13800000001", PasswordHash: demoHash, Nickname: "王小雨", Avatar: "王", Gender: "女", ProfileDone: true, Verified: true, Status: "active", CreatedAt: now.AddDate(0, 0, -18)}
 	s.Accounts[3] = &Account{ID: 3, Phone: "13800000002", PasswordHash: demoHash, Nickname: "张同学", Avatar: "张", Gender: "男", ProfileDone: true, Verified: true, Status: "active", CreatedAt: now.AddDate(0, 0, -12)}
@@ -63,8 +67,10 @@ func NewStore(cfg *config.Config) *Store {
 	s.Comments[1] = &Comment{ID: 1, PostID: 2, Author: s.public(2), Text: "算我一个！", Status: "public", CreatedAt: now.Add(-18 * time.Minute)}
 	s.Comments[2] = &Comment{ID: 2, PostID: 2, Author: s.public(3), Text: "新手可以参加吗？", Status: "public", CreatedAt: now.Add(-8 * time.Minute)}
 	s.Verifications[1] = &Verification{ID: 1, AccountID: 3, Nickname: "张同学", RealName: "张同学", StudentNo: "2023000066", MaterialURL: "/private/verifications/demo.jpg", Status: "pending", CreatedAt: now.Add(-8 * 24 * time.Hour)}
-	s.Announcements[1] = &Announcement{ID: 1, Title: "图书馆开放时间调整", Summary: "期末复习期间延长开放时间。", Body: "请同学们合理安排学习计划，具体安排以相关部门正式通知为准。", Published: true, CreatedAt: now.Add(-2 * time.Hour)}
-	s.Announcements[2] = &Announcement{ID: 2, Title: "校园社区内测说明", Summary: "当前处于 100 人内测阶段。", Body: "欢迎通过反馈入口提交建议。", Published: true, CreatedAt: now.Add(-72 * time.Hour)}
+	publishedRecently := now.Add(-2 * time.Hour)
+	publishedEarlier := now.Add(-72 * time.Hour)
+	s.Announcements[1] = &Announcement{ID: 1, Title: "图书馆开放时间调整", Summary: "期末复习期间延长开放时间。", Body: "请同学们合理安排学习计划，具体安排以相关部门正式通知为准。", LinkURL: "https://www.syu.edu.cn/", LinkText: "查看学校官网", Published: true, CreatedAt: publishedRecently, UpdatedAt: publishedRecently, PublishedAt: &publishedRecently}
+	s.Announcements[2] = &Announcement{ID: 2, Title: "校园社区内测说明", Summary: "当前处于 100 人内测阶段。", Body: "欢迎通过反馈入口提交建议。", Published: true, CreatedAt: publishedEarlier, UpdatedAt: publishedEarlier, PublishedAt: &publishedEarlier}
 	s.Tools[1] = &Tool{ID: 1, Name: "AI 问答", Type: "ai", Icon: "sparkles", Weight: 100, Enabled: true}
 	s.Tools[2] = &Tool{ID: 2, Name: "校园地图", Type: "map", Icon: "map", Weight: 90, Enabled: true}
 	s.Tools[3] = &Tool{ID: 3, Name: "常用网址", Type: "links", Icon: "link", Weight: 80, Enabled: true}
@@ -121,8 +127,91 @@ func (s *Store) AccountBySession(t string) (*Account, bool) {
 func (s *Store) AdminBySession(t string) (string, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	a, ok := s.AdminSessions[t]
-	return a, ok
+	username, ok := s.AdminSessions[t]
+	if !ok {
+		return "", false
+	}
+	admin, exists := s.Admins[username]
+	if !exists || !admin.Enabled {
+		return "", false
+	}
+	return username, true
+}
+func (s *Store) AdminLogin(username, password string) (*AdminAccount, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	admin, ok := s.Admins[username]
+	if !ok || !admin.Enabled || !security.VerifyPassword(admin.PasswordHash, password) {
+		return nil, errors.New("登录名或密码错误")
+	}
+	copy := *admin
+	copy.RoleIDs = append([]int64(nil), admin.RoleIDs...)
+	return &copy, nil
+}
+func (s *Store) AdminAccount(username string) (*AdminAccount, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	admin, ok := s.Admins[username]
+	if !ok {
+		return nil, false
+	}
+	copy := *admin
+	copy.RoleIDs = append([]int64(nil), admin.RoleIDs...)
+	return &copy, true
+}
+func (s *Store) AdminPermissions(username string) []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.AdminPermissionsUnlocked(username)
+}
+func (s *Store) AdminPermissionsUnlocked(username string) []string {
+	admin := s.Admins[username]
+	if admin == nil {
+		return []string{}
+	}
+	if admin.IsSuper {
+		return []string{"*"}
+	}
+	seen := map[string]bool{}
+	out := []string{}
+	for _, roleID := range admin.RoleIDs {
+		role := s.AdminRoles[roleID]
+		if role == nil {
+			continue
+		}
+		for _, permission := range role.Permissions {
+			if permission != "*" && !seen[permission] {
+				seen[permission] = true
+				out = append(out, permission)
+			}
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+func (s *Store) AdminHasPermission(username, permission string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	admin := s.Admins[username]
+	if admin == nil || !admin.Enabled {
+		return false
+	}
+	if admin.IsSuper {
+		return true
+	}
+	for _, item := range s.AdminPermissionsUnlocked(username) {
+		if item == permission {
+			return true
+		}
+	}
+	return false
+}
+func (s *Store) InvalidateAdminSessionsUnlocked(username string) {
+	for token, sessionUsername := range s.AdminSessions {
+		if sessionUsername == username {
+			delete(s.AdminSessions, token)
+		}
+	}
 }
 func (s *Store) Login(phone, password string) (*Account, error) {
 	s.mu.RLock()

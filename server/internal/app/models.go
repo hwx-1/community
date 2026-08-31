@@ -2,16 +2,38 @@ package app
 
 import "time"
 
-type Account struct {
+// AdminAccount 独立于社区账号。只有种子超级管理员拥有 IsSuper；
+// 其他管理员通过 RoleIDs 聚合权限，不因学生认证获得后台权限。
+type AdminAccount struct {
 	ID           int64     `json:"id"`
-	Phone        string    `json:"phone,omitempty"`
+	Username     string    `json:"username"`
 	PasswordHash string    `json:"-"`
-	Nickname     string    `json:"nickname"`
-	Avatar       string    `json:"avatar"`
-	Gender       string    `json:"gender,omitempty"`
-	RealName     string    `json:"real_name,omitempty"`
-	StudentNo    string    `json:"student_no,omitempty"`
-	ClassName    string    `json:"class_name,omitempty"`
+	IsSuper      bool      `json:"is_super"`
+	RoleIDs      []int64   `json:"role_ids"`
+	Enabled      bool      `json:"enabled"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+type AdminRole struct {
+	ID          int64     `json:"id"`
+	Name        string    `json:"name"`
+	Permissions []string  `json:"permissions"`
+	Protected   bool      `json:"protected"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type Account struct {
+	ID           int64      `json:"id"`
+	Phone        string     `json:"phone,omitempty"`
+	PasswordHash string     `json:"-"`
+	Nickname     string     `json:"nickname"`
+	Avatar       string     `json:"avatar"`
+	Gender       string     `json:"gender,omitempty"`
+	RealName     string     `json:"real_name,omitempty"`
+	StudentNo    string     `json:"student_no,omitempty"`
+	ClassName    string     `json:"class_name,omitempty"`
 	ProfileDone  bool       `json:"profile_done"`
 	Verified     bool       `json:"verified"`
 	Status       string     `json:"status"` // active / muted / banned / deactivated
@@ -68,12 +90,17 @@ type Verification struct {
 }
 
 type Announcement struct {
-	ID        int64     `json:"id"`
-	Title     string    `json:"title"`
-	Summary   string    `json:"summary"`
-	Body      string    `json:"body"`
-	Published bool      `json:"published"`
-	CreatedAt time.Time `json:"created_at"`
+	ID          int64      `json:"id"`
+	Title       string     `json:"title"`
+	Summary     string     `json:"summary"`
+	Body        string     `json:"body"`
+	ImageURL    string     `json:"image_url,omitempty"`
+	LinkURL     string     `json:"link_url,omitempty"`
+	LinkText    string     `json:"link_text,omitempty"`
+	Published   bool       `json:"published"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+	PublishedAt *time.Time `json:"published_at,omitempty"`
 }
 type Tool struct {
 	ID      int64  `json:"id"`
@@ -139,14 +166,14 @@ type AuditLog struct {
 
 // Report 举报：帖子 / 评论 / 私信共用一张表，举报人身份仅超管可见。
 type Report struct {
-	ID         int64     `json:"id"`
-	ReporterID int64     `json:"-"` // 不向普通接口泄露举报人
-	TargetType string    `json:"target_type"` // post / comment / dm
-	TargetID   int64     `json:"target_id"`
-	Reason     string    `json:"reason"`
-	Status     string    `json:"status"` // pending / dismissed / actioned
-	Result     string    `json:"result,omitempty"`
-	CreatedAt  time.Time `json:"created_at"`
+	ID         int64      `json:"id"`
+	ReporterID int64      `json:"-"`           // 不向普通接口泄露举报人
+	TargetType string     `json:"target_type"` // post / comment / dm
+	TargetID   int64      `json:"target_id"`
+	Reason     string     `json:"reason"`
+	Status     string     `json:"status"` // pending / dismissed / actioned
+	Result     string     `json:"result,omitempty"`
+	CreatedAt  time.Time  `json:"created_at"`
 	ResolvedAt *time.Time `json:"resolved_at,omitempty"`
 }
 
@@ -189,11 +216,11 @@ type SMSCode struct {
 	LastSent  time.Time
 }
 
-// Notification 消息页通知：评论 / 回复 / 举报结果 / 官方回答 / 处罚 / 申诉结果。
+// Notification 消息页通知：点赞 / 评论 / 回复 / 举报结果 / 官方回答 / 处罚 / 申诉结果。
 type Notification struct {
 	ID        int64     `json:"id"`
 	AccountID int64     `json:"-"`
-	Type      string    `json:"type"` // comment / reply / report_result / official_answer / punishment / appeal_result
+	Type      string    `json:"type"` // like / comment / reply / report_result / official_answer / punishment / appeal_result
 	Title     string    `json:"title"`
 	Body      string    `json:"body"`
 	RefType   string    `json:"ref_type,omitempty"`

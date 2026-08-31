@@ -25,7 +25,6 @@ const navItems: { to: string; label: string; icon: IconName }[] = [
 const toolPaths: Record<string, string> = { ai: '/tools/ai', map: '/tools/map', links: '/tools/links' }
 
 export default function Layout() {
-  const [menuOpen, setMenuOpen] = useState(false)
   const [keyword, setKeyword] = useState('')
   const [theme, setTheme] = useState<Theme>(initialTheme)
   const navigate = useNavigate()
@@ -51,13 +50,6 @@ export default function Layout() {
     }
   }, [loaded, account, location.pathname, navigate])
 
-  useEffect(() => setMenuOpen(false), [location.pathname])
-  useEffect(() => {
-    const close = (event: KeyboardEvent) => event.key === 'Escape' && setMenuOpen(false)
-    window.addEventListener('keydown', close)
-    return () => window.removeEventListener('keydown', close)
-  }, [])
-
   const submitSearch = (event: FormEvent) => {
     event.preventDefault()
     navigate(`/search${keyword.trim() ? `?q=${encodeURIComponent(keyword.trim())}` : ''}`)
@@ -81,16 +73,6 @@ export default function Layout() {
       <header className={styles.topbar}>
         <div className={styles.headerInner}>
           <div className={styles.topLeft}>
-            <button
-              className={`${styles.iconButton} ${styles.menuButton}`}
-              type="button"
-              aria-label="打开导航菜单"
-              aria-expanded={menuOpen}
-              onClick={() => setMenuOpen(true)}
-            >
-              <Icon name="menu" />
-            </button>
-
             <NavLink to="/" className={styles.brand} aria-label="xsnbb 首页">
               <span className={styles.brandMark}>x</span>
               <span>xsnbb</span>
@@ -148,29 +130,48 @@ export default function Layout() {
           <RightSidebar />
         </aside>
       </div>
-
-      {menuOpen && (
-        <div className={styles.mobileOverlay} role="presentation" onMouseDown={() => setMenuOpen(false)}>
-          <aside
-            className={styles.mobileDrawer}
-            role="dialog"
-            aria-modal="true"
-            aria-label="导航菜单"
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <div className={styles.drawerHead}>
-              <span className={styles.drawerTitle}>导航</span>
-              <button className={styles.iconButton} type="button" aria-label="关闭导航菜单" onClick={() => setMenuOpen(false)}>
-                <Icon name="close" />
-              </button>
-            </div>
-            <ProfileCard />
-            <NavList unread={unreadTotal} />
-            <p className={styles.communityNote}>学生共建社区 · 非学校官方平台</p>
-          </aside>
-        </div>
-      )}
+      <MobileBottomNav unread={unreadTotal} />
     </div>
+  )
+}
+
+function MobileBottomNav({ unread = 0 }: { unread?: number }) {
+  const items: { to: string; label: string; icon: IconName }[] = [
+    { to: '/', label: '首页', icon: 'home' },
+    { to: '/tools', label: '工具', icon: 'toolbox' },
+    { to: '/messages', label: '消息', icon: 'message' },
+    { to: '/me', label: '个人页', icon: 'user' },
+  ]
+
+  return (
+    <nav className={styles.mobileBottomNav} aria-label="手机主导航">
+      {items.slice(0, 2).map((item) => (
+        <MobileNavItem key={item.to} {...item} unread={0} />
+      ))}
+      <NavLink to="/compose" className={styles.mobilePublish} aria-label="发布新帖">
+        <span><Icon name="plus" /></span>
+        <small>发布</small>
+      </NavLink>
+      {items.slice(2).map((item) => (
+        <MobileNavItem key={item.to} {...item} unread={item.to === '/messages' ? unread : 0} />
+      ))}
+    </nav>
+  )
+}
+
+function MobileNavItem({ to, label, icon, unread }: { to: string; label: string; icon: IconName; unread: number }) {
+  return (
+    <NavLink
+      to={to}
+      end={to === '/'}
+      className={({ isActive }) => isActive ? `${styles.mobileNavItem} ${styles.mobileNavItemOn}` : styles.mobileNavItem}
+    >
+      <span>
+        <Icon name={icon} />
+        {unread > 0 && <i>{unread > 99 ? '99+' : unread}</i>}
+      </span>
+      <small>{label}</small>
+    </NavLink>
   )
 }
 

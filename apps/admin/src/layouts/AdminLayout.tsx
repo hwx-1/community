@@ -22,36 +22,46 @@ import { useAuth } from '../auth'
 
 const { Sider, Header, Content } = Layout
 
-const menuItems = [
+const allMenuItems = [
   { key: '/dashboard', icon: <DashboardOutlined />, label: '仪表盘' },
   {
     key: '/verifications',
     icon: <SafetyCertificateOutlined />,
     label: '认证审核',
+    permission: 'verification.review',
   },
-  { key: '/posts', icon: <FileTextOutlined />, label: '帖子管理' },
-  { key: '/comments', icon: <CommentOutlined />, label: '评论管理' },
-  { key: '/reports', icon: <FlagOutlined />, label: '举报处理' },
-  { key: '/appeals', icon: <AlertOutlined />, label: '申诉处理' },
-  { key: '/users', icon: <TeamOutlined />, label: '用户管理' },
-  { key: '/announcements', icon: <NotificationOutlined />, label: '公告管理' },
-  { key: '/tools', icon: <AppstoreOutlined />, label: '百宝箱工具' },
-  { key: '/ai-providers', icon: <RobotOutlined />, label: 'AI 服务' },
-  { key: '/kb', icon: <BookOutlined />, label: '知识库' },
+  { key: '/posts', icon: <FileTextOutlined />, label: '帖子管理', permission: 'post.moderate' },
+  { key: '/comments', icon: <CommentOutlined />, label: '评论管理', permission: 'comment.moderate' },
+  { key: '/reports', icon: <FlagOutlined />, label: '举报处理', permission: 'report.review' },
+  { key: '/appeals', icon: <AlertOutlined />, label: '申诉处理', permission: 'appeal.review' },
+  { key: '/users', icon: <TeamOutlined />, label: '用户管理', permission: 'user.manage' },
+  { key: '/announcements', icon: <NotificationOutlined />, label: '公告管理', superOnly: true },
+  { key: '/tools', icon: <AppstoreOutlined />, label: '百宝箱工具', permission: 'tool.manage' },
+  { key: '/ai-providers', icon: <RobotOutlined />, label: 'AI 服务', permission: 'ai_provider.manage' },
+  { key: '/kb', icon: <BookOutlined />, label: '知识库', permission: 'kb.manage' },
   {
     key: '/pending-questions',
     icon: <QuestionCircleOutlined />,
     label: '待补充问题',
+    permission: 'pending_question.answer',
   },
-  { key: '/settings', icon: <SettingOutlined />, label: '运营配置' },
-  { key: '/roles', icon: <KeyOutlined />, label: '角色权限' },
-  { key: '/audit-logs', icon: <HistoryOutlined />, label: '操作日志' },
+  { key: '/settings', icon: <SettingOutlined />, label: '运营配置', permission: 'settings.manage' },
+  { key: '/roles', icon: <KeyOutlined />, label: '管理员与权限', superOnly: true },
+  { key: '/audit-logs', icon: <HistoryOutlined />, label: '操作日志', permission: 'audit.security.read' },
 ]
 
 export default function AdminLayout() {
   const navigate = useNavigate()
   const location = useLocation()
   const { admin, logout } = useAuth()
+  const menuItems = allMenuItems.filter(
+    (item) =>
+      (!item.superOnly || admin?.is_super) &&
+      (!item.permission ||
+        admin?.is_super ||
+        admin?.permissions.includes('*') ||
+        admin?.permissions.includes(item.permission)),
+  )
 
   const selectedKey =
     menuItems.find((item) => location.pathname.startsWith(item.key))?.key ??

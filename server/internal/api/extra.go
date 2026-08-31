@@ -158,14 +158,17 @@ func (a *API) moderateComment(c *gin.Context) {
 func (a *API) adminReports(c *gin.Context) {
 	status := c.Query("status")
 	items := []gin.H{}
+	adminAccount := c.MustGet("admin_account").(*app.AdminAccount)
 	a.store.MuRLock(func() {
 		for _, r := range a.store.Reports {
 			if status != "" && r.Status != status {
 				continue
 			}
-			reporter := ""
-			if acc, ok := a.store.Accounts[r.ReporterID]; ok {
-				reporter = acc.Nickname // 举报人身份仅后台可见
+			reporter := "已隐藏"
+			if adminAccount.IsSuper {
+				if acc, ok := a.store.Accounts[r.ReporterID]; ok {
+					reporter = acc.Nickname
+				}
 			}
 			items = append(items, gin.H{"report": r, "reporter": reporter})
 		}

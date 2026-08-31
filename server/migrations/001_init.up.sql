@@ -47,17 +47,30 @@ CREATE TABLE student_bindings (
     bound_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- 角色与权限：权限点独立授予，徽标不自动授予权限
+-- 后台管理员账号独立于社区账号：使用登录名 + 密码，不依赖手机号或学生认证
+CREATE TABLE admin_accounts (
+    id            BIGSERIAL PRIMARY KEY,
+    username      VARCHAR(32) NOT NULL UNIQUE,
+    password_hash TEXT        NOT NULL,
+    is_super      BOOLEAN     NOT NULL DEFAULT FALSE,
+    enabled       BOOLEAN     NOT NULL DEFAULT TRUE,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT admin_username_format CHECK (username ~ '^[A-Za-z][A-Za-z0-9_]{2,31}$')
+);
+
+-- 角色与权限：仅超级管理员管理；权限点独立授予，认证徽标不自动授予权限
 CREATE TABLE roles (
     id          BIGSERIAL PRIMARY KEY,
     name        VARCHAR(32) NOT NULL UNIQUE,
-    is_super    BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    protected   BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE permissions (
     id   BIGSERIAL PRIMARY KEY,
-    code VARCHAR(64) NOT NULL UNIQUE  -- 权限点，如 verify.review / dm.read
+    code VARCHAR(64) NOT NULL UNIQUE  -- 权限点，如 verification.review / dm.read
 );
 
 CREATE TABLE role_permissions (
@@ -66,18 +79,18 @@ CREATE TABLE role_permissions (
     PRIMARY KEY (role_id, permission_id)
 );
 
-CREATE TABLE account_roles (
-    account_id BIGINT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-    role_id    BIGINT NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
-    granted_by BIGINT NOT NULL,
+CREATE TABLE admin_account_roles (
+    admin_account_id BIGINT NOT NULL REFERENCES admin_accounts(id) ON DELETE CASCADE,
+    role_id          BIGINT NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+    granted_by       BIGINT NOT NULL REFERENCES admin_accounts(id),
     granted_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    PRIMARY KEY (account_id, role_id)
+    PRIMARY KEY (admin_account_id, role_id)
 );
 
 -- 后台操作日志：仅追加，无 UPDATE/DELETE 接口
 CREATE TABLE admin_audit_logs (
     id          BIGSERIAL PRIMARY KEY,
-    operator_id BIGINT NOT NULL,
+    operator_id BIGINT NOT NULL REFERENCES admin_accounts(id),
     action      VARCHAR(64) NOT NULL,
     target_type VARCHAR(32),
     target_id   VARCHAR(64),

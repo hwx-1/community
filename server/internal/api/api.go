@@ -3,16 +3,17 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
 	"github.com/xsnbb/server/internal/adapters"
 	"github.com/xsnbb/server/internal/app"
 	"github.com/xsnbb/server/internal/config"
-	"github.com/xsnbb/server/internal/security"
 )
 
 const (
@@ -67,9 +68,24 @@ func (a *API) Register(r *gin.Engine) {
 	act.POST("/posts/:id/bookmark", a.csrf(), a.bookmarkPost)
 	act.GET("/posts/:id/comments", a.listComments)
 	act.POST("/posts/:id/comments", a.csrf(), a.notMuted(), a.createComment)
-	act.POST("/posts/:id/reports", a.csrf(), func(c *gin.Context) { id, ok := idParam(c); if ok { a.reportTarget(c, "post", id) } })
-	act.POST("/comments/:id/reports", a.csrf(), func(c *gin.Context) { id, ok := idParam(c); if ok { a.reportTarget(c, "comment", id) } })
-	act.POST("/users/:id/reports", a.csrf(), func(c *gin.Context) { id, ok := idParam(c); if ok { a.reportTarget(c, "user", id) } })
+	act.POST("/posts/:id/reports", a.csrf(), func(c *gin.Context) {
+		id, ok := idParam(c)
+		if ok {
+			a.reportTarget(c, "post", id)
+		}
+	})
+	act.POST("/comments/:id/reports", a.csrf(), func(c *gin.Context) {
+		id, ok := idParam(c)
+		if ok {
+			a.reportTarget(c, "comment", id)
+		}
+	})
+	act.POST("/users/:id/reports", a.csrf(), func(c *gin.Context) {
+		id, ok := idParam(c)
+		if ok {
+			a.reportTarget(c, "user", id)
+		}
+	})
 	act.GET("/tags", a.listTags)
 	act.POST("/uploads", a.csrf(), a.upload)
 	act.GET("/users/:id", a.publicUser)
@@ -80,7 +96,12 @@ func (a *API) Register(r *gin.Engine) {
 	act.GET("/direct-conversations", a.listDirectConversations)
 	act.GET("/direct-conversations/:id", a.getDirectConversation)
 	act.POST("/direct-conversations/:id/messages", a.csrf(), a.notMuted(), a.sendDirectMessage)
-	act.POST("/direct-conversations/:id/reports", a.csrf(), func(c *gin.Context) { id, ok := idParam(c); if ok { a.reportTarget(c, "dm", id) } })
+	act.POST("/direct-conversations/:id/reports", a.csrf(), func(c *gin.Context) {
+		id, ok := idParam(c)
+		if ok {
+			a.reportTarget(c, "dm", id)
+		}
+	})
 	act.GET("/ai/models", a.aiModels)
 	act.GET("/ai/conversations", a.aiConversations)
 	act.POST("/ai/conversations", a.csrf(), a.createAIConversation)
@@ -89,40 +110,49 @@ func (a *API) Register(r *gin.Engine) {
 
 	admin := v1.Group("/admin")
 	admin.POST("/auth/login", a.adminLogin)
-	admin.POST("/auth/logout", a.adminAuth(), a.csrf(), a.adminLogout)
-	admin.GET("/me", a.adminAuth(), a.adminMe)
-	admin.GET("/dashboard", a.adminAuth(), a.adminDashboard)
-	admin.GET("/verifications", a.adminAuth(), a.adminVerifications)
-	admin.PATCH("/verifications/:id", a.adminAuth(), a.csrf(), a.reviewVerification)
-	admin.GET("/posts", a.adminAuth(), a.adminPosts)
-	admin.PATCH("/posts/:id", a.adminAuth(), a.csrf(), a.moderatePost)
-	admin.GET("/users", a.adminAuth(), a.adminUsers)
-	admin.PATCH("/users/:id", a.adminAuth(), a.csrf(), a.updateUserStatus)
-	admin.GET("/announcements", a.adminAuth(), a.adminAnnouncements)
-	admin.POST("/announcements", a.adminAuth(), a.csrf(), a.createAnnouncement)
-	admin.PATCH("/announcements/:id", a.adminAuth(), a.csrf(), a.updateAnnouncement)
-	admin.GET("/tools", a.adminAuth(), a.adminTools)
-	admin.POST("/tools", a.adminAuth(), a.csrf(), a.createTool)
-	admin.PATCH("/tools/:id", a.adminAuth(), a.csrf(), a.updateTool)
-	admin.GET("/ai-providers", a.adminAuth(), a.adminProviders)
-	admin.POST("/ai-providers", a.adminAuth(), a.csrf(), a.createProvider)
-	admin.PATCH("/ai-providers/:id", a.adminAuth(), a.csrf(), a.updateProvider)
-	admin.GET("/roles", a.adminAuth(), a.adminRoles)
-	admin.GET("/audit-logs", a.adminAuth(), a.adminAudits)
-	admin.GET("/comments", a.adminAuth(), a.adminComments)
-	admin.PATCH("/comments/:id", a.adminAuth(), a.csrf(), a.moderateComment)
-	admin.GET("/reports", a.adminAuth(), a.adminReports)
-	admin.PATCH("/reports/:id", a.adminAuth(), a.csrf(), a.resolveReport)
-	admin.GET("/appeals", a.adminAuth(), a.adminAppeals)
-	admin.PATCH("/appeals/:id", a.adminAuth(), a.csrf(), a.resolveAppeal)
-	admin.GET("/kb", a.adminAuth(), a.adminKBList)
-	admin.POST("/kb", a.adminAuth(), a.csrf(), a.adminKBCreate)
-	admin.PATCH("/kb/:id", a.adminAuth(), a.csrf(), a.adminKBUpdate)
-	admin.DELETE("/kb/:id", a.adminAuth(), a.csrf(), a.adminKBDelete)
-	admin.GET("/pending-questions", a.adminAuth(), a.adminPendingQuestions)
-	admin.POST("/pending-questions/:id/answer", a.adminAuth(), a.csrf(), a.adminAnswerQuestion)
-	admin.GET("/settings", a.adminAuth(), a.adminGetSettings)
-	admin.PUT("/settings", a.adminAuth(), a.csrf(), a.adminUpdateSettings)
+	secured := admin.Group("", a.adminAuth())
+	secured.POST("/auth/logout", a.csrf(), a.adminLogout)
+	secured.GET("/me", a.adminMe)
+	secured.GET("/dashboard", a.adminDashboard)
+	secured.GET("/verifications", a.requireAdminPermission("verification.review"), a.adminVerifications)
+	secured.PATCH("/verifications/:id", a.requireAdminPermission("verification.review"), a.csrf(), a.reviewVerification)
+	secured.GET("/posts", a.requireAdminPermission("post.moderate"), a.adminPosts)
+	secured.PATCH("/posts/:id", a.requireAdminPermission("post.moderate"), a.csrf(), a.moderatePost)
+	secured.GET("/users", a.requireAdminPermission("user.manage"), a.adminUsers)
+	secured.PATCH("/users/:id", a.requireAdminPermission("user.manage"), a.csrf(), a.updateUserStatus)
+	secured.GET("/announcements", a.superAdminOnly(), a.adminAnnouncements)
+	secured.POST("/announcements", a.superAdminOnly(), a.csrf(), a.createAnnouncement)
+	secured.PATCH("/announcements/:id", a.superAdminOnly(), a.csrf(), a.updateAnnouncement)
+	secured.POST("/announcements/upload", a.superAdminOnly(), a.csrf(), a.upload)
+	secured.GET("/tools", a.requireAdminPermission("tool.manage"), a.adminTools)
+	secured.POST("/tools", a.requireAdminPermission("tool.manage"), a.csrf(), a.createTool)
+	secured.PATCH("/tools/:id", a.requireAdminPermission("tool.manage"), a.csrf(), a.updateTool)
+	secured.GET("/ai-providers", a.requireAdminPermission("ai_provider.manage"), a.adminProviders)
+	secured.POST("/ai-providers", a.requireAdminPermission("ai_provider.manage"), a.csrf(), a.createProvider)
+	secured.PATCH("/ai-providers/:id", a.requireAdminPermission("ai_provider.manage"), a.csrf(), a.updateProvider)
+	secured.GET("/roles", a.superAdminOnly(), a.adminRoles)
+	secured.POST("/roles", a.superAdminOnly(), a.csrf(), a.createAdminRole)
+	secured.PATCH("/roles/:id", a.superAdminOnly(), a.csrf(), a.updateAdminRole)
+	secured.DELETE("/roles/:id", a.superAdminOnly(), a.csrf(), a.deleteAdminRole)
+	secured.GET("/admins", a.superAdminOnly(), a.adminAccounts)
+	secured.POST("/admins", a.superAdminOnly(), a.csrf(), a.createAdminAccount)
+	secured.PATCH("/admins/:username", a.superAdminOnly(), a.csrf(), a.updateAdminAccount)
+	secured.POST("/admins/:username/reset-password", a.superAdminOnly(), a.csrf(), a.resetAdminPassword)
+	secured.GET("/audit-logs", a.requireAdminPermission("audit.security.read"), a.adminAudits)
+	secured.GET("/comments", a.requireAdminPermission("comment.moderate"), a.adminComments)
+	secured.PATCH("/comments/:id", a.requireAdminPermission("comment.moderate"), a.csrf(), a.moderateComment)
+	secured.GET("/reports", a.requireAdminPermission("report.review"), a.adminReports)
+	secured.PATCH("/reports/:id", a.requireAdminPermission("report.review"), a.csrf(), a.resolveReport)
+	secured.GET("/appeals", a.requireAdminPermission("appeal.review"), a.adminAppeals)
+	secured.PATCH("/appeals/:id", a.requireAdminPermission("appeal.review"), a.csrf(), a.resolveAppeal)
+	secured.GET("/kb", a.requireAdminPermission("kb.manage"), a.adminKBList)
+	secured.POST("/kb", a.requireAdminPermission("kb.manage"), a.csrf(), a.adminKBCreate)
+	secured.PATCH("/kb/:id", a.requireAdminPermission("kb.manage"), a.csrf(), a.adminKBUpdate)
+	secured.DELETE("/kb/:id", a.requireAdminPermission("kb.manage"), a.csrf(), a.adminKBDelete)
+	secured.GET("/pending-questions", a.requireAdminPermission("pending_question.answer"), a.adminPendingQuestions)
+	secured.POST("/pending-questions/:id/answer", a.requireAdminPermission("pending_question.answer"), a.csrf(), a.adminAnswerQuestion)
+	secured.GET("/settings", a.requireAdminPermission("settings.manage"), a.adminGetSettings)
+	secured.PUT("/settings", a.requireAdminPermission("settings.manage"), a.csrf(), a.adminUpdateSettings)
 }
 
 func (a *API) cors() gin.HandlerFunc {
@@ -218,6 +248,29 @@ func (a *API) adminAuth() gin.HandlerFunc {
 			return
 		}
 		c.Set("admin", name)
+		if account, exists := a.store.AdminAccount(name); exists {
+			c.Set("admin_account", account)
+		}
+		c.Next()
+	}
+}
+func (a *API) requireAdminPermission(permission string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		username := c.MustGet("admin").(string)
+		if !a.store.AdminHasPermission(username, permission) {
+			fail(c, http.StatusForbidden, "ADMIN_PERMISSION_DENIED", "当前管理员没有执行此操作的权限")
+			return
+		}
+		c.Next()
+	}
+}
+func (a *API) superAdminOnly() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		account, ok := c.MustGet("admin_account").(*app.AdminAccount)
+		if !ok || !account.IsSuper {
+			fail(c, http.StatusForbidden, "SUPER_ADMIN_REQUIRED", "仅超级管理员可执行此操作")
+			return
+		}
 		c.Next()
 	}
 }
@@ -313,7 +366,7 @@ func (a *API) logout(c *gin.Context) {
 	clearCookie(c, communityCookie)
 	c.Status(204)
 }
-func (a *API) me(c *gin.Context)     { c.JSON(200, gin.H{"account": current(c)}) }
+func (a *API) me(c *gin.Context) { c.JSON(200, gin.H{"account": current(c)}) }
 func (a *API) updateProfile(c *gin.Context) {
 	account := current(c)
 	var in struct{ Nickname, Avatar, Gender, RealName, StudentNo, ClassName string }
@@ -495,7 +548,19 @@ func (a *API) togglePostFlag(c *gin.Context, kind string) {
 			return
 		}
 		if kind == "like" {
-			a.store.ToggleLikeLocked(id, account.ID)
+			liked, _ := a.store.ToggleLikeLocked(id, account.ID)
+			// 仅在“未点赞 → 已点赞”时通知帖子作者。取消点赞不产生消息，
+			// 作者给自己的帖子点赞也不产生无意义的自通知。
+			if liked && p.Author.ID != account.ID {
+				a.store.NotifyLocked(
+					p.Author.ID,
+					"like",
+					fmt.Sprintf("%s 赞同了你的帖子", account.Nickname),
+					truncateRunes(p.Text, 50),
+					"post",
+					id,
+				)
+			}
 		} else {
 			a.store.ToggleBookmarkLocked(id, account.ID)
 		}
@@ -616,7 +681,7 @@ func (a *API) listAnnouncements(c *gin.Context) {
 			}
 		}
 	})
-	sort.Slice(items, func(i, j int) bool { return items[i].CreatedAt.After(items[j].CreatedAt) })
+	sort.Slice(items, func(i, j int) bool { return announcementTime(items[i]).After(announcementTime(items[j])) })
 	c.JSON(200, gin.H{"items": items})
 }
 func (a *API) getAnnouncement(c *gin.Context) {
@@ -903,20 +968,32 @@ func (a *API) askAI(c *gin.Context) {
 
 func (a *API) adminLogin(c *gin.Context) {
 	var in struct{ Username, Password string }
-	if c.ShouldBindJSON(&in) != nil || in.Username != a.store.AdminUser || !security.VerifyPassword(a.store.AdminPasswordHash, in.Password) {
+	if c.ShouldBindJSON(&in) != nil {
+		fail(c, 401, "ADMIN_LOGIN_FAILED", "登录名或密码错误")
+		return
+	}
+	admin, err := a.store.AdminLogin(in.Username, in.Password)
+	if err != nil {
 		fail(c, 401, "ADMIN_LOGIN_FAILED", "登录名或密码错误")
 		return
 	}
 	session := a.store.NewSession(0, in.Username)
 	a.setSession(c, adminCookie, session, csrfAdminCookie)
 	a.store.MuLock(func() { a.store.AddAuditUnlocked(in.Username, "admin.login", "session", "success", "", "security") })
-	c.JSON(200, gin.H{"admin": gin.H{"username": in.Username, "is_super": true, "permissions": []string{"*"}}})
+	c.JSON(200, gin.H{"admin": a.adminResponse(admin)})
 }
 func (a *API) adminLogout(c *gin.Context) { clearCookie(c, adminCookie); c.Status(204) }
 func (a *API) adminMe(c *gin.Context) {
-	c.JSON(200, gin.H{"admin": gin.H{"username": c.MustGet("admin"), "is_super": true, "permissions": []string{"*"}}})
+	username := c.MustGet("admin").(string)
+	admin, ok := a.store.AdminAccount(username)
+	if !ok {
+		fail(c, 401, "ADMIN_SESSION_EXPIRED", "后台登录已失效")
+		return
+	}
+	c.JSON(200, gin.H{"admin": a.adminResponse(admin)})
 }
 func (a *API) adminDashboard(c *gin.Context) {
+	canReadAudits := a.store.AdminHasPermission(c.MustGet("admin").(string), "audit.security.read")
 	a.store.MuRLock(func() {
 		pending := 0
 		for _, v := range a.store.Verifications {
@@ -930,7 +1007,11 @@ func (a *API) adminDashboard(c *gin.Context) {
 				publicPosts++
 			}
 		}
-		c.JSON(200, gin.H{"users": len(a.store.Accounts), "public_posts": publicPosts, "pending_verifications": pending, "ai_providers": len(a.store.Providers), "recent_audits": lastAudits(a.store.AuditLogs, 5)})
+		recentAudits := []app.AuditLog{}
+		if canReadAudits {
+			recentAudits = lastAudits(a.store.AuditLogs, 5)
+		}
+		c.JSON(200, gin.H{"users": len(a.store.Accounts), "public_posts": publicPosts, "pending_verifications": pending, "ai_providers": len(a.store.Providers), "recent_audits": recentAudits})
 	})
 }
 func (a *API) adminVerifications(c *gin.Context) {
@@ -1014,9 +1095,17 @@ func (a *API) moderatePost(c *gin.Context) {
 }
 func (a *API) adminUsers(c *gin.Context) {
 	items := []*app.Account{}
+	canReadPrivate := a.store.AdminHasPermission(c.MustGet("admin").(string), "profile.private.read")
 	a.store.MuRLock(func() {
 		for _, account := range a.store.Accounts {
-			items = append(items, account)
+			copy := *account
+			if !canReadPrivate {
+				copy.Phone = ""
+				copy.RealName = ""
+				copy.StudentNo = ""
+				copy.ClassName = ""
+			}
+			items = append(items, &copy)
 		}
 	})
 	c.JSON(200, gin.H{"items": items})
@@ -1027,7 +1116,7 @@ func (a *API) updateUserStatus(c *gin.Context) {
 		return
 	}
 	var in struct {
-		Status   string `json:"status"`   // active / muted / banned
+		Status   string `json:"status"`    // active / muted / banned
 		MuteDays int    `json:"mute_days"` // 禁言固定档位：1 / 3 / 7 天
 		Reason   string `json:"reason"`
 	}
@@ -1090,46 +1179,120 @@ func (a *API) adminAnnouncements(c *gin.Context) {
 			items = append(items, *item)
 		}
 	})
+	sort.Slice(items, func(i, j int) bool { return items[i].CreatedAt.After(items[j].CreatedAt) })
 	c.JSON(200, gin.H{"items": items})
 }
+
+type announcementInput struct {
+	Title     string `json:"title"`
+	Summary   string `json:"summary"`
+	Body      string `json:"body"`
+	ImageURL  string `json:"image_url"`
+	LinkURL   string `json:"link_url"`
+	LinkText  string `json:"link_text"`
+	Published bool   `json:"published"`
+}
+
+func (in *announcementInput) normalize() error {
+	in.Title = strings.TrimSpace(in.Title)
+	in.Summary = strings.TrimSpace(in.Summary)
+	in.Body = strings.TrimSpace(in.Body)
+	in.ImageURL = strings.TrimSpace(in.ImageURL)
+	in.LinkURL = strings.TrimSpace(in.LinkURL)
+	in.LinkText = strings.TrimSpace(in.LinkText)
+	if in.Title == "" || in.Summary == "" || in.Body == "" {
+		return fmt.Errorf("请完整填写标题、摘要和正文")
+	}
+	if utf8.RuneCountInString(in.Title) > 60 || utf8.RuneCountInString(in.Summary) > 120 || utf8.RuneCountInString(in.Body) > 10000 {
+		return fmt.Errorf("标题最多 60 字、摘要最多 120 字、正文最多 10000 字")
+	}
+	if in.ImageURL != "" && !strings.HasPrefix(in.ImageURL, "/uploads/") && !safeHTTPURL(in.ImageURL) {
+		return fmt.Errorf("图片地址无效")
+	}
+	if in.LinkURL != "" && !safeHTTPURL(in.LinkURL) {
+		return fmt.Errorf("点击链接必须是有效的 http 或 https 地址")
+	}
+	if in.LinkURL == "" {
+		in.LinkText = ""
+	} else if in.LinkText == "" {
+		in.LinkText = "查看详情"
+	}
+	if utf8.RuneCountInString(in.LinkText) > 30 {
+		return fmt.Errorf("链接文字最多 30 字")
+	}
+	return nil
+}
+
+func safeHTTPURL(raw string) bool {
+	parsed, err := url.ParseRequestURI(raw)
+	return err == nil && parsed.Host != "" && (parsed.Scheme == "http" || parsed.Scheme == "https")
+}
+
+func announcementTime(item app.Announcement) time.Time {
+	if item.PublishedAt != nil {
+		return *item.PublishedAt
+	}
+	return item.CreatedAt
+}
+
 func (a *API) createAnnouncement(c *gin.Context) {
-	var in app.Announcement
-	if c.ShouldBindJSON(&in) != nil || in.Title == "" {
-		fail(c, 422, "ANNOUNCEMENT_INVALID", "标题不能为空")
+	var input announcementInput
+	if c.ShouldBindJSON(&input) != nil {
+		fail(c, 422, "ANNOUNCEMENT_INVALID", "公告内容格式不正确")
+		return
+	}
+	if err := input.normalize(); err != nil {
+		fail(c, 422, "ANNOUNCEMENT_INVALID", err.Error())
 		return
 	}
 	admin := c.MustGet("admin").(string)
+	var created app.Announcement
 	a.store.MuLock(func() {
-		in.ID = a.store.NextID()
-		in.CreatedAt = time.Now()
-		a.store.Announcements[in.ID] = &in
-		a.store.AddAuditUnlocked(admin, "announcement.create", fmt.Sprintf("announcement:%d", in.ID), "success", "", "operational")
+		now := time.Now()
+		created = app.Announcement{ID: a.store.NextID(), Title: input.Title, Summary: input.Summary, Body: input.Body, ImageURL: input.ImageURL, LinkURL: input.LinkURL, LinkText: input.LinkText, Published: input.Published, CreatedAt: now, UpdatedAt: now}
+		if created.Published {
+			created.PublishedAt = &now
+		}
+		a.store.Announcements[created.ID] = &created
+		a.store.AddAuditUnlocked(admin, "announcement.create", fmt.Sprintf("announcement:%d", created.ID), "success", "", "operational")
 	})
-	c.JSON(201, gin.H{"announcement": in})
+	c.JSON(201, gin.H{"announcement": created})
 }
 func (a *API) updateAnnouncement(c *gin.Context) {
 	id, ok := idParam(c)
 	if !ok {
 		return
 	}
-	var in app.Announcement
-	_ = c.ShouldBindJSON(&in)
+	var input announcementInput
+	if c.ShouldBindJSON(&input) != nil {
+		fail(c, 422, "ANNOUNCEMENT_INVALID", "公告内容格式不正确")
+		return
+	}
+	if err := input.normalize(); err != nil {
+		fail(c, 422, "ANNOUNCEMENT_INVALID", err.Error())
+		return
+	}
+	admin := c.MustGet("admin").(string)
 	a.store.MuLock(func() {
 		item, exists := a.store.Announcements[id]
 		if !exists {
 			fail(c, 404, "ANNOUNCEMENT_NOT_FOUND", "公告不存在")
 			return
 		}
-		if in.Title != "" {
-			item.Title = in.Title
+		wasPublished := item.Published
+		item.Title = input.Title
+		item.Summary = input.Summary
+		item.Body = input.Body
+		item.ImageURL = input.ImageURL
+		item.LinkURL = input.LinkURL
+		item.LinkText = input.LinkText
+		item.Published = input.Published
+		item.UpdatedAt = time.Now()
+		if input.Published && !wasPublished {
+			publishedAt := item.UpdatedAt
+			item.PublishedAt = &publishedAt
 		}
-		if in.Summary != "" {
-			item.Summary = in.Summary
-		}
-		if in.Body != "" {
-			item.Body = in.Body
-		}
-		item.Published = in.Published
+		a.store.AddAuditUnlocked(admin, "announcement.update", fmt.Sprintf("announcement:%d", id), "success", "", "operational")
 		c.JSON(200, gin.H{"announcement": item})
 	})
 }
@@ -1148,7 +1311,12 @@ func (a *API) createTool(c *gin.Context) {
 		fail(c, 422, "TOOL_INVALID", "工具名称不能为空")
 		return
 	}
-	a.store.MuLock(func() { in.ID = a.store.NextID(); a.store.Tools[in.ID] = &in })
+	admin := c.MustGet("admin").(string)
+	a.store.MuLock(func() {
+		in.ID = a.store.NextID()
+		a.store.Tools[in.ID] = &in
+		a.store.AddAuditUnlocked(admin, "tool.create", fmt.Sprintf("tool:%d", in.ID), "success", "", "operational")
+	})
 	c.JSON(201, gin.H{"tool": in})
 }
 func (a *API) updateTool(c *gin.Context) {
@@ -1158,6 +1326,7 @@ func (a *API) updateTool(c *gin.Context) {
 	}
 	var in app.Tool
 	_ = c.ShouldBindJSON(&in)
+	admin := c.MustGet("admin").(string)
 	a.store.MuLock(func() {
 		item, exists := a.store.Tools[id]
 		if !exists {
@@ -1173,6 +1342,7 @@ func (a *API) updateTool(c *gin.Context) {
 		item.URL = in.URL
 		item.Weight = in.Weight
 		item.Enabled = in.Enabled
+		a.store.AddAuditUnlocked(admin, "tool.update", fmt.Sprintf("tool:%d", id), "success", "", "operational")
 		c.JSON(200, gin.H{"tool": item})
 	})
 }
@@ -1192,7 +1362,12 @@ func (a *API) createProvider(c *gin.Context) {
 		return
 	}
 	in.APIKeyMasked = "••••configured"
-	a.store.MuLock(func() { in.ID = a.store.NextID(); a.store.Providers[in.ID] = &in })
+	admin := c.MustGet("admin").(string)
+	a.store.MuLock(func() {
+		in.ID = a.store.NextID()
+		a.store.Providers[in.ID] = &in
+		a.store.AddAuditUnlocked(admin, "ai_provider.create", fmt.Sprintf("ai_provider:%d", in.ID), "success", "", "security")
+	})
 	c.JSON(201, gin.H{"provider": in})
 }
 func (a *API) updateProvider(c *gin.Context) {
@@ -1202,6 +1377,7 @@ func (a *API) updateProvider(c *gin.Context) {
 	}
 	var in app.AIProvider
 	_ = c.ShouldBindJSON(&in)
+	admin := c.MustGet("admin").(string)
 	a.store.MuLock(func() {
 		item, exists := a.store.Providers[id]
 		if !exists {
@@ -1220,11 +1396,9 @@ func (a *API) updateProvider(c *gin.Context) {
 		item.Enabled = in.Enabled
 		item.Public = in.Public
 		item.FallbackOrder = in.FallbackOrder
+		a.store.AddAuditUnlocked(admin, "ai_provider.update", fmt.Sprintf("ai_provider:%d", id), "success", "", "security")
 		c.JSON(200, gin.H{"provider": item})
 	})
-}
-func (a *API) adminRoles(c *gin.Context) {
-	c.JSON(200, gin.H{"items": []gin.H{{"id": 1, "name": "超级管理员", "permissions": []string{"*"}}, {"id": 2, "name": "认证审核", "permissions": []string{"verification.review"}}, {"id": 3, "name": "内容审核", "permissions": []string{"post.moderate", "report.review"}}}, "permission_catalog": []string{"verification.review", "post.moderate", "report.review", "profile.private.read", "dm.read", "tool.manage", "ai_provider.manage", "audit.security.read"}})
 }
 func (a *API) adminAudits(c *gin.Context) {
 	a.store.MuRLock(func() { c.JSON(200, gin.H{"items": a.store.AuditLogs}) })
@@ -1245,6 +1419,7 @@ func truncateRunes(v string, n int) string {
 	}
 	return string(r[:n]) + "…"
 }
+
 // kbMatch 知识库关键词匹配：问题与条目标题/内容存在公共子串（≥2 字）即视为命中。
 // 生产环境由 PostgreSQL pg_trgm 承担，此处为本地数据实现。
 func kbMatch(e *app.KBEntry, question string) bool {

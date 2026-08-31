@@ -52,8 +52,13 @@ export interface Announcement {
   title: string
   summary: string
   body: string
+  image_url?: string
+  link_url?: string
+  link_text?: string
   published: boolean
   created_at: string
+  updated_at: string
+  published_at?: string
 }
 
 export interface Tool {

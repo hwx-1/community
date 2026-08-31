@@ -105,6 +105,28 @@ body {
   color: #1e293b;
 }
 
+.page-heading-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 768px) {
+  .page-heading-row {
+    flex-direction: column;
+  }
+
+  .admin-content {
+    padding: 12px;
+  }
+
+  .admin-content-inner {
+    padding: 16px;
+  }
+}
+
 .page-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -142,5 +164,23 @@ body {
 
 .verification-material-img {
   max-width: 100%;
+  border-radius: 8px;
+}
+
+.announcement-image-editor {
+  margin: -14px 0 22px;
+}
+
+.announcement-image-preview {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.announcement-image-preview .ant-image-img {
+  width: 220px;
+  height: 124px;
+  object-fit: cover;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
 }

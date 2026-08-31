@@ -1,6 +1,7 @@
 import type {
   Account,
   Admin,
+  AdminAccount,
   AIProvider,
   Announcement,
   AppealItem,
@@ -176,6 +177,26 @@ export const api = {
       `${BASE}/announcements/${id}`,
       body,
     ),
+  uploadAnnouncementImage: async (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    const res = await fetch(`${BASE}/announcements/upload`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'X-CSRF-Token': csrfToken() },
+      body: form,
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      const err = (data as { error?: { code?: string; message?: string } }).error
+      throw new ApiError(
+        res.status,
+        err?.code ?? 'UPLOAD_FAILED',
+        err?.message ?? '图片上传失败',
+      )
+    }
+    return data as { url: string; dev_mode: boolean }
+  },
 
   // 百宝箱工具
   tools: () => request<{ items: Tool[] }>('GET', `${BASE}/tools`),
@@ -224,6 +245,36 @@ export const api = {
     request<{ items: Role[]; permission_catalog: string[] }>(
       'GET',
       `${BASE}/roles`,
+    ),
+  createRole: (body: { name: string; permissions: string[] }) =>
+    request<{ role: Role }>('POST', `${BASE}/roles`, body),
+  updateRole: (
+    id: number,
+    body: { name: string; permissions: string[] },
+  ) => request<{ role: Role }>('PATCH', `${BASE}/roles/${id}`, body),
+  deleteRole: (id: number) => request<void>('DELETE', `${BASE}/roles/${id}`),
+
+  // 管理员账号（仅超级管理员）
+  admins: () => request<{ items: AdminAccount[] }>('GET', `${BASE}/admins`),
+  createAdmin: (body: {
+    username: string
+    password: string
+    role_ids: number[]
+  }) => request<{ admin: Admin }>('POST', `${BASE}/admins`, body),
+  updateAdmin: (
+    username: string,
+    body: { role_ids: number[]; enabled?: boolean },
+  ) =>
+    request<{ admin: Admin }>(
+      'PATCH',
+      `${BASE}/admins/${encodeURIComponent(username)}`,
+      body,
+    ),
+  resetAdminPassword: (username: string, password: string) =>
+    request<{ reset: boolean }>(
+      'POST',
+      `${BASE}/admins/${encodeURIComponent(username)}/reset-password`,
+      { password },
     ),
 
   // 操作日志

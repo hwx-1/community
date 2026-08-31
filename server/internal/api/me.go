@@ -56,7 +56,16 @@ func (a *API) changePassword(c *gin.Context) {
 		fail(c, 500, "HASH_FAILED", "密码处理失败，请重试")
 		return
 	}
-	a.store.MuLock(func() { account.PasswordHash = hash })
+	currentSession, _ := c.Cookie(communityCookie)
+	a.store.MuLock(func() {
+		account.PasswordHash = hash
+		// 保留当前设备，撤销同一账号的其他会话，避免旧密码设备继续长期在线。
+		for session, accountID := range a.store.Sessions {
+			if accountID == account.ID && session != currentSession {
+				delete(a.store.Sessions, session)
+			}
+		}
+	})
 	c.JSON(http.StatusOK, gin.H{"changed": true})
 }
 

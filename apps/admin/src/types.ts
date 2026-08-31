@@ -1,9 +1,18 @@
 // 与 Go 后端约定一致的领域模型（JSON 字段均为 snake_case）
 
 export interface Admin {
+  id: number
   username: string
   is_super: boolean
+  role_ids: number[]
   permissions: string[]
+  enabled: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface AdminAccount extends Admin {
+  role_names: string[]
 }
 
 export interface AuditLog {
@@ -140,8 +149,13 @@ export interface Announcement {
   title: string
   summary: string
   body: string
+  image_url?: string
+  link_url?: string
+  link_text?: string
   published: boolean
   created_at: string
+  updated_at: string
+  published_at?: string
 }
 
 export interface Tool {
@@ -194,7 +208,11 @@ export interface Settings {
 }
 
 export interface Role {
-  id: string
+  id: number
   name: string
   permissions: string[]
+  protected: boolean
+  assigned_admins: number
+  created_at: string
+  updated_at: string
 }

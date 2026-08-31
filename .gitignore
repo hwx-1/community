@@ -12,3 +12,9 @@ server/xsnbb-api.pid
 server/xsnbb-api.log
 server/.prod.pid
 server/xsnbb.log
+apps/mobile/android/.gradle/
+apps/mobile/android/build/
+apps/mobile/android/app/build/
+apps/mobile/.bundle/
+apps/harmony/.hvigor/
+apps/harmony/entry/build/

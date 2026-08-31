@@ -4,9 +4,13 @@
   "version": "0.1.0",
   "packageManager": "pnpm@10.14.0",
   "scripts": {
+    "dev:mobile": "pnpm --filter @xsnbb/mobile start",
+    "android": "pnpm --filter @xsnbb/mobile android",
+    "ios": "pnpm --filter @xsnbb/mobile ios",
     "dev:web": "pnpm --filter @xsnbb/web dev",
     "dev:admin": "pnpm --filter @xsnbb/admin dev",
     "dev:server": "go -C server run ./cmd/api",
+    "build:harmony": "cd apps/harmony && DEVECO_SDK_HOME=/Applications/DevEco-Studio.app/Contents/sdk /Applications/DevEco-Studio.app/Contents/tools/hvigor/bin/hvigorw assembleHap --mode module -p product=default --no-daemon",
     "test:server": "go -C server test ./...",
     "build": "pnpm -r build"
   }
