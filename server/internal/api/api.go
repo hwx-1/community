@@ -96,6 +96,7 @@ func (a *API) Register(r *gin.Engine) {
 	act.GET("/direct-conversations", a.listDirectConversations)
 	act.GET("/direct-conversations/:id", a.getDirectConversation)
 	act.POST("/direct-conversations/:id/messages", a.csrf(), a.notMuted(), a.sendDirectMessage)
+	act.POST("/direct-conversations/:id/read", a.csrf(), a.markDirectConversationRead)
 	act.POST("/direct-conversations/:id/reports", a.csrf(), func(c *gin.Context) {
 		id, ok := idParam(c)
 		if ok {
@@ -369,7 +370,14 @@ func (a *API) logout(c *gin.Context) {
 func (a *API) me(c *gin.Context) { c.JSON(200, gin.H{"account": current(c)}) }
 func (a *API) updateProfile(c *gin.Context) {
 	account := current(c)
-	var in struct{ Nickname, Avatar, Gender, RealName, StudentNo, ClassName string }
+	var in struct {
+		Nickname  string `json:"nickname"`
+		Avatar    string `json:"avatar"`
+		Gender    string `json:"gender"`
+		RealName  string `json:"real_name"`
+		StudentNo string `json:"student_no"`
+		ClassName string `json:"class_name"`
+	}
 	if c.ShouldBindJSON(&in) != nil {
 		fail(c, 400, "INVALID_BODY", "资料格式错误")
 		return
@@ -843,6 +851,45 @@ func (a *API) sendDirectMessage(c *gin.Context) {
 	})
 }
 
+// markDirectConversationRead 进入会话后持久化已读：把会话中对方已送达的消息置为 read，
+// 返回当前用户全部会话的私信未读总数，便于客户端直接刷新底栏冒泡。
+func (a *API) markDirectConversationRead(c *gin.Context) {
+	id, ok := idParam(c)
+	if !ok {
+		return
+	}
+	account := current(c)
+	a.store.MuLock(func() {
+		conv, exists := a.store.DirectConversations[id]
+		if !exists || !contains(conv.MemberIDs, account.ID) {
+			fail(c, 404, "CONVERSATION_NOT_FOUND", "会话不存在")
+			return
+		}
+		for i := range conv.Messages {
+			if conv.Messages[i].SenderID != account.ID && conv.Messages[i].Status == "delivered" {
+				conv.Messages[i].Status = "read"
+			}
+		}
+		c.JSON(200, gin.H{"unread": directUnreadUnlocked(a.store, account.ID)})
+	})
+}
+
+// directUnreadUnlocked 统计当前用户所有会话中对方发来且未读的消息总数（调用方需持有锁）。
+func directUnreadUnlocked(s *app.Store, accountID int64) int {
+	unread := 0
+	for _, conv := range s.DirectConversations {
+		if !contains(conv.MemberIDs, accountID) {
+			continue
+		}
+		for _, m := range conv.Messages {
+			if m.SenderID != accountID && m.Status == "delivered" {
+				unread++
+			}
+		}
+	}
+	return unread
+}
+
 func (a *API) aiModels(c *gin.Context) {
 	items := []app.AIProvider{}
 	a.store.MuRLock(func() {
@@ -914,56 +961,155 @@ func (a *API) askAI(c *gin.Context) {
 		fail(c, 422, "QUESTION_INVALID", "问题不能为空")
 		return
 	}
+	question := strings.TrimSpace(in.Text)
+	model := in.Model
+	if model == "" {
+		model = "campus-demo"
+	}
+	now := time.Now()
+
+	// 第一阶段（持锁，只做快速内存操作）：校验会话与额度、知识库优先命中、
+	// 写入用户消息；未命中知识库时快照历史与可用 AI 服务，随后释放锁再发起外部调用。
+	var (
+		user      app.AIMessage
+		remaining int
+		kbHit     bool
+		failed    bool
+		history   []app.AIMessage
+		providers []app.AIProvider
+	)
+	a.store.MuLock(func() {
+		conv, exists := a.store.AIConversations[id]
+		if !exists || conv.OwnerID != account.ID {
+			fail(c, 404, "CONVERSATION_NOT_FOUND", "会话不存在")
+			failed = true
+			return
+		}
+		remaining = 10 - countAnswersTodayUnlocked(a.store.AIConversations, account.ID)
+		if remaining <= 0 {
+			fail(c, 429, "AI_QUOTA_EXHAUSTED", "今日问答额度已用完")
+			failed = true
+			return
+		}
+		user = app.AIMessage{ID: a.store.NextID(), Role: "user", Text: question, CreatedAt: now}
+		// 1) 优先检索校内知识库（结构化 + 关键词），命中则直接引用并标注来源
+		for _, e := range a.store.KBEntries {
+			if !e.Enabled {
+				continue
+			}
+			if kbMatch(e, question) {
+				answer := app.AIMessage{ID: a.store.NextID(), Role: "assistant", Text: e.Content, Model: model, Source: fmt.Sprintf("校内资料 · %s（%s）", e.Source, e.SourceDate), CreatedAt: now}
+				conv.Messages = append(conv.Messages, user, answer)
+				conv.Model = model
+				if conv.Title == "新会话" {
+					conv.Title = truncateRunes(question, 20)
+				}
+				kbHit = true
+				c.JSON(200, gin.H{"user_message": user, "answer": answer, "remaining": remaining - 1})
+				return
+			}
+		}
+		// 2) 知识库未命中：先落用户消息（调用外部服务耗时不可控，不能持锁），
+		//    再快照对话历史与可用 AI 服务（含真实密钥的副本）
+		conv.Messages = append(conv.Messages, user)
+		conv.Model = model
+		if conv.Title == "新会话" {
+			conv.Title = truncateRunes(question, 20)
+		}
+		history = append(history, conv.Messages...)
+		providers = enabledProviders(a.store.Providers, model)
+	})
+	if failed || kbHit {
+		return
+	}
+
+	// 第二阶段（不持锁）：依次调用 AI 服务（OpenAI 兼容协议）；
+	// 全部失败再退回联网检索适配层，最后退回本地开发回答。
+	answerText, source := "", ""
+	if len(providers) > 0 {
+		messages := buildChatMessages(history)
+		for _, p := range providers {
+			text, err := a.adapters.AI.Chat(c.Request.Context(), p.BaseURL, p.APIKey, p.Model, messages)
+			if err != nil || strings.TrimSpace(text) == "" {
+				continue
+			}
+			answerText = text
+			source = fmt.Sprintf("AI 服务 · %s", p.Name)
+			break
+		}
+	}
+	needRecord := false
+	if answerText == "" {
+		if searchResult, err := a.adapters.Search.Search(c.Request.Context(), question); err == nil && searchResult != "" {
+			answerText = searchResult
+			source = "联网检索"
+		} else {
+			answerText = "本地开发回答：校内资料未覆盖该问题，且联网检索服务未配置。该问题已记录到后台「待补充问题」，管理员补充答案后会在消息页通知你。"
+			source = "本地开发模式"
+		}
+		// 知识库与大模型都没答上的问题，记录待补充等待管理员补充
+		needRecord = true
+	}
+
+	// 第三阶段（持锁）：会话可能在等待期间被删除；追加回答并按需记录待补充问题
 	a.store.MuLock(func() {
 		conv, exists := a.store.AIConversations[id]
 		if !exists || conv.OwnerID != account.ID {
 			fail(c, 404, "CONVERSATION_NOT_FOUND", "会话不存在")
 			return
 		}
-		remaining := 10 - countAnswersTodayUnlocked(a.store.AIConversations, account.ID)
-		if remaining <= 0 {
-			fail(c, 429, "AI_QUOTA_EXHAUSTED", "今日问答额度已用完")
-			return
-		}
-		now := time.Now()
-		user := app.AIMessage{ID: a.store.NextID(), Role: "user", Text: strings.TrimSpace(in.Text), CreatedAt: now}
-		model := in.Model
-		if model == "" {
-			model = "campus-demo"
-		}
-		// 1) 优先检索校内知识库（结构化 + 关键词），命中则直接引用并标注来源
-		answerText, source := "", ""
-		question := strings.TrimSpace(in.Text)
-		for _, e := range a.store.KBEntries {
-			if !e.Enabled {
-				continue
-			}
-			if kbMatch(e, question) {
-				answerText = e.Content
-				source = fmt.Sprintf("校内资料 · %s（%s）", e.Source, e.SourceDate)
-				break
-			}
-		}
-		// 2) 未命中：联网检索适配层（开发模式明确不可用），再退回本地开发回答，
-		//    同时记录待补充问题等待管理员补充
-		if answerText == "" {
-			if searchResult, err := a.adapters.Search.Search(c.Request.Context(), question); err == nil && searchResult != "" {
-				answerText = searchResult
-				source = "联网检索"
-			} else {
-				answerText = "本地开发回答：校内资料未覆盖该问题，且联网检索服务未配置。该问题已记录到后台「待补充问题」，管理员补充答案后会在消息页通知你。"
-				source = "本地开发模式"
-			}
-			recordPendingQuestion(a.store, account.ID, question)
-		}
 		answer := app.AIMessage{ID: a.store.NextID(), Role: "assistant", Text: answerText, Model: model, Source: source, CreatedAt: now}
-		conv.Messages = append(conv.Messages, user, answer)
-		conv.Model = model
-		if conv.Title == "新会话" {
-			conv.Title = truncateRunes(in.Text, 20)
+		conv.Messages = append(conv.Messages, answer)
+		if needRecord {
+			recordPendingQuestion(a.store, account.ID, question)
 		}
 		c.JSON(200, gin.H{"user_message": user, "answer": answer, "remaining": remaining - 1})
 	})
+}
+
+const aiHistoryLimit = 20
+
+// enabledProviders 快照可调用的大模型服务：启用且已配置地址与真实密钥，
+// 按 FallbackOrder 升序；请求指定了模型时，匹配该模型的服务优先（调用方需持有锁）。
+func enabledProviders(all map[int64]*app.AIProvider, model string) []app.AIProvider {
+	items := []app.AIProvider{}
+	for _, p := range all {
+		if p.Enabled && p.BaseURL != "" && p.APIKey != "" {
+			items = append(items, *p)
+		}
+	}
+	sort.SliceStable(items, func(i, j int) bool {
+		mi, mj := items[i].Model == model, items[j].Model == model
+		if mi != mj {
+			return mi
+		}
+		return items[i].FallbackOrder < items[j].FallbackOrder
+	})
+	return items
+}
+
+// buildChatMessages 把会话历史映射为 OpenAI 兼容协议消息，附带校园助手系统提示。
+func buildChatMessages(history []app.AIMessage) []adapters.ChatMessage {
+	messages := []adapters.ChatMessage{{Role: "system", Content: "你是校园社区的 AI 助手，请用简洁、准确、友好的中文回答学生的问题；不确定的信息不要编造，建议同学核实官方渠道。"}}
+	if len(history) > aiHistoryLimit {
+		history = history[len(history)-aiHistoryLimit:]
+	}
+	for _, m := range history {
+		if m.Role != "user" && m.Role != "assistant" {
+			continue
+		}
+		messages = append(messages, adapters.ChatMessage{Role: m.Role, Content: m.Text})
+	}
+	return messages
+}
+
+// maskAPIKey 生成密钥掩码：仅保留末 4 位，绝不回显完整密钥。
+func maskAPIKey(key string) string {
+	runes := []rune(key)
+	if len(runes) <= 4 {
+		return "••••"
+	}
+	return "••••" + string(runes[len(runes)-4:])
 }
 
 func (a *API) adminLogin(c *gin.Context) {
@@ -1355,27 +1501,56 @@ func (a *API) adminProviders(c *gin.Context) {
 	})
 	c.JSON(200, gin.H{"items": items})
 }
+// providerInput 管理端 AI 服务入参；api_key 为真实密钥，仅用于服务端调用，响应中只回掩码。
+type providerInput struct {
+	Name          string `json:"name"`
+	Protocol      string `json:"protocol"`
+	BaseURL       string `json:"base_url"`
+	Model         string `json:"model"`
+	APIKey        string `json:"api_key"`
+	Enabled       bool   `json:"enabled"`
+	Public        bool   `json:"public"`
+	FallbackOrder int    `json:"fallback_order"`
+}
+
 func (a *API) createProvider(c *gin.Context) {
-	var in app.AIProvider
+	var in providerInput
 	if c.ShouldBindJSON(&in) != nil || in.Name == "" || in.BaseURL == "" || in.Model == "" {
 		fail(c, 422, "PROVIDER_INVALID", "服务名称、地址和模型不能为空")
 		return
 	}
-	in.APIKeyMasked = "••••configured"
+	if in.Protocol == "" {
+		in.Protocol = "openai-compatible"
+	}
+	provider := &app.AIProvider{
+		Name:          in.Name,
+		Protocol:      in.Protocol,
+		BaseURL:       in.BaseURL,
+		Model:         in.Model,
+		Enabled:       in.Enabled,
+		Public:        in.Public,
+		FallbackOrder: in.FallbackOrder,
+	}
+	if in.APIKey != "" {
+		provider.APIKey = in.APIKey
+		provider.APIKeyMasked = maskAPIKey(in.APIKey)
+	} else {
+		provider.APIKeyMasked = "••••configured"
+	}
 	admin := c.MustGet("admin").(string)
 	a.store.MuLock(func() {
-		in.ID = a.store.NextID()
-		a.store.Providers[in.ID] = &in
-		a.store.AddAuditUnlocked(admin, "ai_provider.create", fmt.Sprintf("ai_provider:%d", in.ID), "success", "", "security")
+		provider.ID = a.store.NextID()
+		a.store.Providers[provider.ID] = provider
+		a.store.AddAuditUnlocked(admin, "ai_provider.create", fmt.Sprintf("ai_provider:%d", provider.ID), "success", "", "security")
 	})
-	c.JSON(201, gin.H{"provider": in})
+	c.JSON(201, gin.H{"provider": provider})
 }
 func (a *API) updateProvider(c *gin.Context) {
 	id, ok := idParam(c)
 	if !ok {
 		return
 	}
-	var in app.AIProvider
+	var in providerInput
 	_ = c.ShouldBindJSON(&in)
 	admin := c.MustGet("admin").(string)
 	a.store.MuLock(func() {
@@ -1392,6 +1567,11 @@ func (a *API) updateProvider(c *gin.Context) {
 		}
 		if in.Model != "" {
 			item.Model = in.Model
+		}
+		// 密钥留空表示不修改；提交新密钥则整体替换并更新掩码
+		if in.APIKey != "" {
+			item.APIKey = in.APIKey
+			item.APIKeyMasked = maskAPIKey(in.APIKey)
 		}
 		item.Enabled = in.Enabled
 		item.Public = in.Public

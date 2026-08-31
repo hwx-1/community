@@ -61,9 +61,9 @@ func NewStore(cfg *config.Config) *Store {
 	for id, account := range s.Accounts {
 		s.Phones[account.Phone] = id
 	}
-	s.Posts[1] = &Post{ID: 1, Author: s.public(1), Text: "【社区提示】下周起图书馆开放时间调整为 8:00–22:00，期末周延长至 23:00。", Status: "public", Pinned: true, Likes: 32, Comments: 0, CreatedAt: now.Add(-2 * time.Hour), UpdatedAt: now.Add(-2 * time.Hour)}
-	s.Posts[2] = &Post{ID: 2, Author: s.public(1), Text: "周六下午体育馆羽毛球局，还差 2 人，想来的评论区报名～", Images: []string{"/uploads/demo/court-1.jpg", "/uploads/demo/court-2.jpg"}, Tags: []string{"运动", "羽毛球"}, Status: "public", Likes: 8, Comments: 2, CreatedAt: now.Add(-25 * time.Minute), UpdatedAt: now.Add(-25 * time.Minute)}
-	s.Posts[3] = &Post{ID: 3, Author: s.public(2), Text: "高数期末复习重点整理完了，需要的同学可以自取。", Tags: []string{"学习资料", "期末复习"}, Status: "public", Likes: 21, Comments: 1, CreatedAt: now.Add(-time.Hour), UpdatedAt: now.Add(-time.Hour)}
+	s.Posts[1] = &Post{ID: 1, Author: s.public(1), Text: "【社区提示】下周起图书馆开放时间调整为 8:00–22:00，期末周延长至 23:00。", Status: "public", Pinned: true, Likes: 32, Comments: 0, Bookmarks: 12, CreatedAt: now.Add(-2 * time.Hour), UpdatedAt: now.Add(-2 * time.Hour)}
+	s.Posts[2] = &Post{ID: 2, Author: s.public(1), Text: "周六下午体育馆羽毛球局，还差 2 人，想来的评论区报名～", Images: []string{"/uploads/demo/court-1.jpg", "/uploads/demo/court-2.jpg"}, Tags: []string{"运动", "羽毛球"}, Status: "public", Likes: 8, Comments: 2, Bookmarks: 3, CreatedAt: now.Add(-25 * time.Minute), UpdatedAt: now.Add(-25 * time.Minute)}
+	s.Posts[3] = &Post{ID: 3, Author: s.public(2), Text: "高数期末复习重点整理完了，需要的同学可以自取。", Tags: []string{"学习资料", "期末复习"}, Status: "public", Likes: 21, Comments: 1, Bookmarks: 9, CreatedAt: now.Add(-time.Hour), UpdatedAt: now.Add(-time.Hour)}
 	s.Comments[1] = &Comment{ID: 1, PostID: 2, Author: s.public(2), Text: "算我一个！", Status: "public", CreatedAt: now.Add(-18 * time.Minute)}
 	s.Comments[2] = &Comment{ID: 2, PostID: 2, Author: s.public(3), Text: "新手可以参加吗？", Status: "public", CreatedAt: now.Add(-8 * time.Minute)}
 	s.Verifications[1] = &Verification{ID: 1, AccountID: 3, Nickname: "张同学", RealName: "张同学", StudentNo: "2023000066", MaterialURL: "/private/verifications/demo.jpg", Status: "pending", CreatedAt: now.Add(-8 * 24 * time.Hour)}
@@ -344,18 +344,23 @@ func (s *Store) ToggleLikeLocked(postID, accountID int64) (liked bool, likes int
 	return true, p.Likes
 }
 
-// ToggleBookmarkLocked 切换收藏，返回最新状态。
+// ToggleBookmarkLocked 切换收藏并维护计数，返回最新状态。
 func (s *Store) ToggleBookmarkLocked(postID, accountID int64) bool {
 	set, ok := s.PostBookmarks[postID]
 	if !ok {
 		set = map[int64]bool{}
 		s.PostBookmarks[postID] = set
 	}
+	p := s.Posts[postID]
 	if set[accountID] {
 		delete(set, accountID)
+		if p.Bookmarks > 0 {
+			p.Bookmarks--
+		}
 		return false
 	}
 	set[accountID] = true
+	p.Bookmarks++
 	return true
 }
 

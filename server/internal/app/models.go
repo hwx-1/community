@@ -59,6 +59,7 @@ type Post struct {
 	Pinned     bool          `json:"pinned"`
 	Likes      int           `json:"likes"`
 	Comments   int           `json:"comments"`
+	Bookmarks  int           `json:"bookmarks"`
 	Liked      bool          `json:"liked"`
 	Bookmarked bool          `json:"bookmarked"`
 	CreatedAt  time.Time     `json:"created_at"`
@@ -116,6 +117,7 @@ type AIProvider struct {
 	Name          string `json:"name"`
 	Protocol      string `json:"protocol"`
 	BaseURL       string `json:"base_url"`
+	APIKey        string `json:"-"` // 真实密钥仅供服务端调用供应商使用，任何接口都不得序列化输出
 	APIKeyMasked  string `json:"api_key_masked"`
 	Model         string `json:"model"`
 	Enabled       bool   `json:"enabled"`

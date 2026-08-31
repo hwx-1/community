@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -270,6 +271,97 @@ func TestAIKnowledgeBaseFirst(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("expected unanswered question to be recorded")
+	}
+}
+
+func TestAIProviderLLMAnswer(t *testing.T) {
+	// 模拟 OpenAI 兼容供应商：校验鉴权与入参，返回固定回答
+	llm := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/chat/completions" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer test-key" {
+			t.Errorf("expected bearer key, got %q", got)
+		}
+		var req struct {
+			Model    string `json:"model"`
+			Messages []struct {
+				Role    string `json:"role"`
+				Content string `json:"content"`
+			} `json:"messages"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		if req.Model != "campus-llm" {
+			t.Errorf("unexpected model: %s", req.Model)
+		}
+		found := false
+		for _, m := range req.Messages {
+			if m.Role == "user" && m.Content == "校医院周末开门吗" {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("expected question in chat history: %v", req.Messages)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"choices":[{"message":{"role":"assistant","content":"周末 9:00-17:00 开门（来自模拟大模型）"}}]}`)
+	}))
+	defer llm.Close()
+
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	// 管理员配置带真实密钥的 AI 服务
+	admin := newClient(t, srv.URL)
+	admin.do(http.MethodPost, "/api/v1/admin/auth/login", map[string]string{"username": "admin", "password": "Admin12345"})
+	status, body := admin.do(http.MethodPost, "/api/v1/admin/ai-providers", map[string]any{
+		"name": "校园大模型", "base_url": llm.URL + "/v1", "model": "campus-llm",
+		"api_key": "test-key", "enabled": true, "public": true, "fallback_order": 1,
+	})
+	if status != http.StatusCreated {
+		t.Fatalf("create provider failed: %d %v", status, body)
+	}
+	// 真实密钥不得出现在任何响应中
+	if raw, _ := json.Marshal(body); strings.Contains(string(raw), "test-key") {
+		t.Fatal("api key leaked in create response")
+	}
+	status, body = admin.do(http.MethodGet, "/api/v1/admin/ai-providers", nil)
+	if status != http.StatusOK {
+		t.Fatalf("list providers failed: %d", status)
+	}
+	if raw, _ := json.Marshal(body); strings.Contains(string(raw), "test-key") {
+		t.Fatal("api key leaked in list response")
+	}
+
+	// 知识库未命中的问题应由大模型回答，并标注服务来源
+	c := newClient(t, srv.URL)
+	c.login(t, "13800000000", "Demo12345")
+	status, body = c.do(http.MethodPost, "/api/v1/ai/conversations", map[string]string{"title": ""})
+	if status != http.StatusCreated {
+		t.Fatalf("create conversation failed: %d %v", status, body)
+	}
+	convID := int64(body["conversation"].(map[string]any)["id"].(float64))
+	status, body = c.do(http.MethodPost, fmt.Sprintf("/api/v1/ai/conversations/%d/messages", convID), map[string]string{"text": "校医院周末开门吗"})
+	if status != http.StatusOK {
+		t.Fatalf("ask failed: %d %v", status, body)
+	}
+	answer := body["answer"].(map[string]any)
+	if answer["text"] != "周末 9:00-17:00 开门（来自模拟大模型）" {
+		t.Fatalf("expected LLM answer, got %v", answer)
+	}
+	if source, _ := answer["source"].(string); !strings.Contains(source, "校园大模型") {
+		t.Fatalf("expected provider source, got %v", answer["source"])
+	}
+
+	// 大模型已回答的问题不应再进入待补充列表
+	status, body = admin.do(http.MethodGet, "/api/v1/admin/pending-questions", nil)
+	if status != http.StatusOK {
+		t.Fatalf("pending questions failed: %d", status)
+	}
+	for _, item := range body["items"].([]any) {
+		if item.(map[string]any)["question"] == "校医院周末开门吗" {
+			t.Fatal("LLM-answered question should not be recorded as pending")
+		}
 	}
 }
 
