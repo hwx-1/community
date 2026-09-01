@@ -3,7 +3,9 @@ package app
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"sort"
 	"strings"
 	"sync"
@@ -15,6 +17,7 @@ import (
 
 type Store struct {
 	mu                  sync.RWMutex
+	db                  *gorm.DB
 	nextID              int64
 	Accounts            map[int64]*Account
 	Phones              map[string]int64
@@ -32,14 +35,13 @@ type Store struct {
 	Admins              map[string]*AdminAccount
 	AdminRoles          map[int64]*AdminRole
 
-	SMSCodes         map[string]*SMSCode // key: purpose + ":" + phone
+	SMSCodes         map[string]*SMSCode
 	Reports          map[int64]*Report
 	KBEntries        map[int64]*KBEntry
 	PendingQuestions map[int64]*PendingQuestion
 	Settings         Settings
 
-	// 按用户记录的互动状态：点赞与收藏仅本人可见，计数落在 Post.Likes 上。
-	PostLikes     map[int64]map[int64]bool // postID → accountID → true
+	PostLikes     map[int64]map[int64]bool
 	PostBookmarks map[int64]map[int64]bool
 	Notifications map[int64]*Notification
 	Punishments   map[int64]*Punishment
@@ -49,8 +51,42 @@ type Store struct {
 func NewStore(cfg *config.Config) *Store {
 	adminHash, _ := security.HashPassword(cfg.SuperAdminPassword)
 	demoHash, _ := security.HashPassword("Demo12345")
-	s := &Store{nextID: 100, Accounts: map[int64]*Account{}, Phones: map[string]int64{}, Sessions: map[string]int64{}, AdminSessions: map[string]string{}, Posts: map[int64]*Post{}, Comments: map[int64]*Comment{}, Verifications: map[int64]*Verification{}, Announcements: map[int64]*Announcement{}, Tools: map[int64]*Tool{}, Providers: map[int64]*AIProvider{}, AIConversations: map[int64]*Conversation{}, DirectConversations: map[int64]*DirectConversation{}, SMSCodes: map[string]*SMSCode{}, Reports: map[int64]*Report{}, KBEntries: map[int64]*KBEntry{}, PendingQuestions: map[int64]*PendingQuestion{}, PostLikes: map[int64]map[int64]bool{}, PostBookmarks: map[int64]map[int64]bool{}, Notifications: map[int64]*Notification{}, Punishments: map[int64]*Punishment{}, Appeals: map[int64]*Appeal{}, Settings: Settings{Greeting: "你好，我想和你聊聊", HotTopics: []string{"期末复习", "羽毛球", "食堂新品"}}, Admins: map[string]*AdminAccount{}, AdminRoles: map[int64]*AdminRole{}}
+	s := &Store{
+		nextID: 100, Accounts: map[int64]*Account{}, Phones: map[string]int64{},
+		Sessions: map[string]int64{}, AdminSessions: map[string]string{},
+		Posts: map[int64]*Post{}, Comments: map[int64]*Comment{},
+		Verifications: map[int64]*Verification{}, Announcements: map[int64]*Announcement{},
+		Tools: map[int64]*Tool{}, Providers: map[int64]*AIProvider{},
+		AIConversations: map[int64]*Conversation{}, DirectConversations: map[int64]*DirectConversation{},
+		SMSCodes: map[string]*SMSCode{}, Reports: map[int64]*Report{},
+		KBEntries: map[int64]*KBEntry{}, PendingQuestions: map[int64]*PendingQuestion{},
+		PostLikes: map[int64]map[int64]bool{}, PostBookmarks: map[int64]map[int64]bool{},
+		Notifications: map[int64]*Notification{}, Punishments: map[int64]*Punishment{},
+		Appeals: map[int64]*Appeal{},
+		Settings: Settings{Greeting: "你好，我想和你聊聊", HotTopics: []string{"期末复习", "羽毛球", "食堂新品"}},
+		Admins: map[string]*AdminAccount{}, AdminRoles: map[int64]*AdminRole{},
+	}
 	now := time.Now()
+
+	// 连接 PostgreSQL
+	if cfg.DatabaseURL != "" {
+		s.db = ConnectDB(cfg.DatabaseURL)
+		if s.db != nil {
+			if err := Migrate(s.db); err != nil {
+				fmt.Printf("[db] migrate failed: %v\n", err)
+				s.db = nil
+			} else {
+				s.loadFromDB()
+				fmt.Printf("[db] loaded %d accounts, %d posts from database\n", len(s.Accounts), len(s.Posts))
+			}
+		}
+	}
+
+	// 如果数据库已加载数据，跳过种子数据
+	if len(s.Accounts) > 0 {
+		return s
+	}
+
 	s.AdminRoles[1] = &AdminRole{ID: 1, Name: "超级管理员", Permissions: []string{"*"}, Protected: true, CreatedAt: now, UpdatedAt: now}
 	s.AdminRoles[2] = &AdminRole{ID: 2, Name: "认证审核", Permissions: []string{"verification.review", "profile.private.read"}, CreatedAt: now, UpdatedAt: now}
 	s.AdminRoles[3] = &AdminRole{ID: 3, Name: "内容与举报审核", Permissions: []string{"post.moderate", "comment.moderate", "report.review", "appeal.review"}, CreatedAt: now, UpdatedAt: now}
@@ -92,17 +128,18 @@ func (s *Store) PublicAccount(id int64) PublicAccount { return s.public(id) }
 func (s *Store) MuLock(fn func())                     { s.mu.Lock(); defer s.mu.Unlock(); fn() }
 func (s *Store) MuRLock(fn func())                    { s.mu.RLock(); defer s.mu.RUnlock(); fn() }
 
-// WithLockErr 在写锁内执行 fn 并透传错误，用于需要中途失败的复合操作。
 func (s *Store) WithLockErr(fn func() error) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return fn()
 }
+
 func token() string {
 	b := make([]byte, 32)
 	_, _ = rand.Read(b)
 	return base64.RawURLEncoding.EncodeToString(b)
 }
+
 func (s *Store) NewSession(accountID int64, admin string) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -114,6 +151,7 @@ func (s *Store) NewSession(accountID int64, admin string) string {
 	}
 	return t
 }
+
 func (s *Store) AccountBySession(t string) (*Account, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -124,6 +162,7 @@ func (s *Store) AccountBySession(t string) (*Account, bool) {
 	a, ok := s.Accounts[id]
 	return a, ok
 }
+
 func (s *Store) AdminBySession(t string) (string, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -137,6 +176,7 @@ func (s *Store) AdminBySession(t string) (string, bool) {
 	}
 	return username, true
 }
+
 func (s *Store) AdminLogin(username, password string) (*AdminAccount, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -148,6 +188,7 @@ func (s *Store) AdminLogin(username, password string) (*AdminAccount, error) {
 	copy.RoleIDs = append([]int64(nil), admin.RoleIDs...)
 	return &copy, nil
 }
+
 func (s *Store) AdminAccount(username string) (*AdminAccount, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -159,11 +200,13 @@ func (s *Store) AdminAccount(username string) (*AdminAccount, bool) {
 	copy.RoleIDs = append([]int64(nil), admin.RoleIDs...)
 	return &copy, true
 }
+
 func (s *Store) AdminPermissions(username string) []string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.AdminPermissionsUnlocked(username)
 }
+
 func (s *Store) AdminPermissionsUnlocked(username string) []string {
 	admin := s.Admins[username]
 	if admin == nil {
@@ -189,6 +232,7 @@ func (s *Store) AdminPermissionsUnlocked(username string) []string {
 	sort.Strings(out)
 	return out
 }
+
 func (s *Store) AdminHasPermission(username, permission string) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -206,6 +250,7 @@ func (s *Store) AdminHasPermission(username, permission string) bool {
 	}
 	return false
 }
+
 func (s *Store) InvalidateAdminSessionsUnlocked(username string) {
 	for token, sessionUsername := range s.AdminSessions {
 		if sessionUsername == username {
@@ -213,6 +258,7 @@ func (s *Store) InvalidateAdminSessionsUnlocked(username string) {
 		}
 	}
 }
+
 func (s *Store) Login(phone, password string) (*Account, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -226,6 +272,7 @@ func (s *Store) Login(phone, password string) (*Account, error) {
 	}
 	return a, nil
 }
+
 func (s *Store) Register(phone, password, nickname string) (*Account, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -248,8 +295,15 @@ func (s *Store) Register(phone, password, nickname string) (*Account, error) {
 	a := &Account{ID: id, Phone: phone, PasswordHash: hash, Nickname: nickname, Avatar: "新", Status: "active", CreatedAt: time.Now()}
 	s.Accounts[id] = a
 	s.Phones[phone] = id
+
+	// 持久化到数据库
+	if s.db != nil {
+		s.db.Create(&DBAccount{ID: a.ID, Phone: a.Phone, PasswordHash: a.PasswordHash, Nickname: a.Nickname, Status: a.Status, CreatedAt: a.CreatedAt.Unix(), UpdatedAt: a.CreatedAt.Unix()})
+	}
+
 	return a, nil
 }
+
 func (s *Store) ListPosts(query string, mine *int64) []Post {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -274,6 +328,7 @@ func (s *Store) ListPosts(query string, mine *int64) []Post {
 	})
 	return out
 }
+
 func (s *Store) ListPostsUnlocked(query string, mine *int64) []Post {
 	out := []Post{}
 	for _, p := range s.Posts {
@@ -296,14 +351,15 @@ func (s *Store) ListPostsUnlocked(query string, mine *int64) []Post {
 	})
 	return out
 }
+
 func (s *Store) AddAudit(operator, action, target, result, reason, category string) {
 	s.AuditLogs = append(s.AuditLogs, AuditLog{ID: s.next(), Operator: operator, Action: action, Target: target, Result: result, Reason: reason, Category: category, CreatedAt: time.Now()})
 }
+
 func (s *Store) AddAuditUnlocked(operator, action, target, result, reason, category string) {
 	s.AddAudit(operator, action, target, result, reason, category)
 }
 
-// ListAllPostsUnlocked 管理端使用：返回全部状态的帖子（含待审/下架/删除）。
 func (s *Store) ListAllPostsUnlocked(query string) []Post {
 	out := []Post{}
 	for _, p := range s.Posts {
@@ -316,7 +372,6 @@ func (s *Store) ListAllPostsUnlocked(query string) []Post {
 	return out
 }
 
-// DecoratePosts 按查看者填充点赞 / 收藏标记（调用方需持有锁）。
 func (s *Store) DecoratePosts(posts []Post, viewerID int64) {
 	for i := range posts {
 		posts[i].Liked = s.PostLikes[posts[i].ID][viewerID]
@@ -324,7 +379,6 @@ func (s *Store) DecoratePosts(posts []Post, viewerID int64) {
 	}
 }
 
-// ToggleLikeLocked 切换点赞并维护计数，返回最新状态。
 func (s *Store) ToggleLikeLocked(postID, accountID int64) (liked bool, likes int) {
 	set, ok := s.PostLikes[postID]
 	if !ok {
@@ -344,7 +398,6 @@ func (s *Store) ToggleLikeLocked(postID, accountID int64) (liked bool, likes int
 	return true, p.Likes
 }
 
-// ToggleBookmarkLocked 切换收藏并维护计数，返回最新状态。
 func (s *Store) ToggleBookmarkLocked(postID, accountID int64) bool {
 	set, ok := s.PostBookmarks[postID]
 	if !ok {
@@ -364,7 +417,6 @@ func (s *Store) ToggleBookmarkLocked(postID, accountID int64) bool {
 	return true
 }
 
-// BookmarksOfLocked 返回某用户收藏的帖子（调用方需持有锁）。
 func (s *Store) BookmarksOfLocked(accountID int64) []Post {
 	out := []Post{}
 	for postID, set := range s.PostBookmarks {
@@ -379,7 +431,6 @@ func (s *Store) BookmarksOfLocked(accountID int64) []Post {
 	return out
 }
 
-// MutedLocked 判断账号当前是否处于禁言中；到期自动恢复 active（调用方需持有写锁）。
 func (s *Store) MutedLocked(a *Account) bool {
 	if a.Status != "muted" {
 		return false
@@ -397,7 +448,6 @@ func (s *Store) MutedLocked(a *Account) bool {
 	return true
 }
 
-// NotifyLocked 追加一条通知（调用方需持有锁）。
 func (s *Store) NotifyLocked(accountID int64, ntype, title, body, refType string, refID int64) {
 	if accountID <= 0 {
 		return
@@ -406,9 +456,61 @@ func (s *Store) NotifyLocked(accountID int64, ntype, title, body, refType string
 	s.Notifications[id] = &Notification{ID: id, AccountID: accountID, Type: ntype, Title: title, Body: body, RefType: refType, RefID: refID, CreatedAt: time.Now()}
 }
 
-// DeleteSession 使社区会话失效（登出 / 注销）。
 func (s *Store) DeleteSession(t string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.Sessions, t)
+}
+
+// ========== 数据库持久化方法 ==========
+
+func (s *Store) loadFromDB() {
+	if s.db == nil {
+		return
+	}
+
+	var dbAccounts []DBAccount
+	if err := s.db.Find(&dbAccounts).Error; err != nil {
+		fmt.Printf("[db] load accounts failed: %v\n", err)
+		return
+	}
+	for _, dba := range dbAccounts {
+		s.Accounts[dba.ID] = &Account{
+			ID: dba.ID, Phone: dba.Phone, PasswordHash: dba.PasswordHash,
+			Nickname: dba.Nickname, Avatar: "新", Status: dba.Status,
+			CreatedAt: time.Unix(dba.CreatedAt, 0),
+		}
+		s.Phones[dba.Phone] = dba.ID
+		if dba.ID >= s.nextID {
+			s.nextID = dba.ID
+		}
+	}
+
+	var dbPosts []DBPost
+	if err := s.db.Find(&dbPosts).Error; err != nil {
+		fmt.Printf("[db] load posts failed: %v\n", err)
+		return
+	}
+	for _, dbp := range dbPosts {
+		var images, tags []string
+		json.Unmarshal([]byte(dbp.Images), &images)
+		json.Unmarshal([]byte(dbp.Tags), &tags)
+		author := s.public(dbp.AuthorID)
+		if author.ID == 0 {
+			author = PublicAccount{ID: dbp.AuthorID, Nickname: "未知用户", Avatar: "?"}
+		}
+		s.Posts[dbp.ID] = &Post{
+			ID: dbp.ID, Author: author, Text: dbp.Text,
+			Images: images, Tags: tags, Status: dbp.Status,
+			Pinned: dbp.Pinned, Likes: dbp.Likes, Comments: dbp.Comments,
+			Bookmarks: dbp.Bookmarks,
+			CreatedAt: time.Unix(dbp.CreatedAt, 0),
+			UpdatedAt: time.Unix(dbp.UpdatedAt, 0),
+		}
+		if dbp.ID >= s.nextID {
+			s.nextID = dbp.ID
+		}
+	}
+
+	s.nextID++ // 确保 nextID 比所有已有 ID 大
 }
