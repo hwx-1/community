@@ -356,6 +356,84 @@ func TestDirectConversationStartAndReport(t *testing.T) {
 	}
 }
 
+// TestDirectMessageUnreadAndVisibility 覆盖跨端共用的私信协议：服务端统一计数、
+// 已读持久化，以及审核未通过消息不得向接收方泄漏。
+func TestDirectMessageUnreadAndVisibility(t *testing.T) {
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	receiver := newClient(t, srv.URL)
+	receiver.login(t, "13800000000", "Demo12345")
+	sender := newClient(t, srv.URL)
+	sender.login(t, "13800000002", "Demo12345")
+
+	// 种子会话 1 先有一条对方招呼；进入会话后服务端持久化为已读。
+	status, body := receiver.do(http.MethodPost, "/api/v1/direct-conversations/1/read", map[string]any{})
+	if status != http.StatusOK || body["unread"].(float64) != 0 {
+		t.Fatalf("mark initial message read failed: %d %v", status, body)
+	}
+
+	// 接收方回复内置招呼解锁会话，随后发送方连续发两条消息。
+	status, _ = receiver.do(http.MethodPost, "/api/v1/direct-conversations/1/messages", map[string]any{
+		"text": "你好，我想和你聊聊", "system": true,
+	})
+	if status != http.StatusCreated {
+		t.Fatalf("reply greeting failed: %d", status)
+	}
+	for _, text := range []string{"第一条未读", "第二条未读"} {
+		status, body = sender.do(http.MethodPost, "/api/v1/direct-conversations/1/messages", map[string]any{
+			"text": text, "system": false,
+		})
+		if status != http.StatusCreated || body["message"].(map[string]any)["status"] != "delivered" {
+			t.Fatalf("send direct message failed: %d %v", status, body)
+		}
+	}
+
+	status, body = receiver.do(http.MethodGet, "/api/v1/direct-conversations", nil)
+	if status != http.StatusOK || body["unread"].(float64) != 2 {
+		t.Fatalf("expected two unread messages: %d %v", status, body)
+	}
+	items := body["items"].([]any)
+	if len(items) == 0 || items[0].(map[string]any)["unread_count"].(float64) != 2 {
+		t.Fatalf("expected per-conversation unread count: %v", body)
+	}
+
+	status, body = receiver.do(http.MethodPost, "/api/v1/direct-conversations/1/read", map[string]any{})
+	if status != http.StatusOK || body["unread"].(float64) != 0 {
+		t.Fatalf("expected unread count cleared: %d %v", status, body)
+	}
+	_, body = receiver.do(http.MethodGet, "/api/v1/direct-conversations/1", nil)
+	detail := body["conversation"].(map[string]any)
+	if detail["unread_count"].(float64) != 0 {
+		t.Fatalf("conversation should stay read: %v", detail)
+	}
+
+	// 审核未通过的消息只保留在发送方视图，接收方列表和详情都不能看到正文。
+	blockedText := "代考包过，测试拦截"
+	status, body = sender.do(http.MethodPost, "/api/v1/direct-conversations/1/messages", map[string]any{
+		"text": blockedText, "system": false,
+	})
+	if status != http.StatusCreated || body["message"].(map[string]any)["status"] != "blocked" {
+		t.Fatalf("expected blocked message: %d %v", status, body)
+	}
+	_, body = receiver.do(http.MethodGet, "/api/v1/direct-conversations/1", nil)
+	for _, raw := range body["conversation"].(map[string]any)["messages"].([]any) {
+		if raw.(map[string]any)["text"] == blockedText {
+			t.Fatal("blocked message leaked to receiver")
+		}
+	}
+	_, body = sender.do(http.MethodGet, "/api/v1/direct-conversations/1", nil)
+	foundBlocked := false
+	for _, raw := range body["conversation"].(map[string]any)["messages"].([]any) {
+		if raw.(map[string]any)["text"] == blockedText {
+			foundBlocked = true
+		}
+	}
+	if !foundBlocked {
+		t.Fatal("sender should retain blocked message and delivery status")
+	}
+}
+
 // TestAdminSeesAllPostStatuses 管理端帖子列表包含非公开状态，社区端不泄露。
 func TestAdminSeesAllPostStatuses(t *testing.T) {
 	srv := newTestServer(t)

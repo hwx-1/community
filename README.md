@@ -21,21 +21,22 @@ corepack pnpm install
 # 2. 准备后端配置（可选，全部留空也能跑：自动落入开发模式）
 cp server/.env.example server/.env
 
-# 3. 启动后端（监听 :8080）
-corepack pnpm dev:server        # 等价于 go -C server run ./cmd/api
+# 3. 一键启动后端 + 社区 Web（:8080 + :5173，/api 代理到 8080）
+corepack pnpm dev               # Ctrl+C 同时停止两个进程
 
-# 4. 另开终端，启动社区 Web（:5173，/api 代理到 8080）
-corepack pnpm dev:web
+# 也可分开启动（各占一个终端）：
+corepack pnpm dev:server        # 仅后端，等价于 go -C server run ./cmd/api
+corepack pnpm dev:web           # 仅社区 Web
 
-# 5. 另开终端，启动管理后台（:5174，/api 代理到 8080）
+# 4. 另开终端，启动管理后台（:5174，/api 代理到 8080）
 corepack pnpm dev:admin
 
-# 6. 移动端：先启动 Metro，再从另一终端启动目标平台
+# 5. 移动端：先启动 Metro，再从另一终端启动目标平台
 corepack pnpm dev:mobile
 corepack pnpm ios       # 需要完整 Xcode + CocoaPods
 corepack pnpm android   # 需要 Android SDK 与模拟器/真机
 
-# 7. 鸿蒙端：构建未签名 debug HAP（需已安装 DevEco Studio）
+# 6. 鸿蒙端：构建未签名 debug HAP（需已安装 DevEco Studio）
 corepack pnpm build:harmony
 # 然后用 DevEco Studio 打开 apps/harmony/ 运行到模拟器/真机，
 # 并把 AppConfig.ets 中的 API_BASE_URL 改为局域网 IP，详见 apps/harmony/README.md

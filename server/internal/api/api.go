@@ -27,14 +27,16 @@ type API struct {
 	cfg      *config.Config
 	store    *app.Store
 	adapters *adapters.Set
+	realtime *realtimeHub
 }
 
 func New(cfg *config.Config, store *app.Store, ads *adapters.Set) *API {
-	return &API{cfg: cfg, store: store, adapters: ads}
+	return &API{cfg: cfg, store: store, adapters: ads, realtime: newRealtimeHub()}
 }
 
 func (a *API) Register(r *gin.Engine) {
 	r.Use(a.cors())
+	r.Use(a.notifyRealtimeAfterMutation())
 	r.GET("/healthz", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"status": "ok", "time": time.Now()}) })
 	v1 := r.Group("/api/v1")
 	v1.POST("/auth/sms-code", a.requestSMSCode)
@@ -43,6 +45,7 @@ func (a *API) Register(r *gin.Engine) {
 	v1.POST("/auth/reset-password", a.resetPassword)
 	v1.POST("/auth/logout", a.auth(), a.csrf(), a.logout)
 	v1.GET("/me", a.auth(), a.me)
+	v1.GET("/events", a.auth(), a.realtimeEvents)
 	v1.GET("/settings/public", a.publicSettings)
 	v1.GET("/capabilities", a.adaptersStatus)
 	// 封禁账号仅可使用：处罚通知、申诉与申诉结果（其余社区功能由 activeOnly 拦截）
@@ -757,27 +760,68 @@ func (a *API) startDirectConversation(c *gin.Context) {
 	})
 }
 
+// visibleDirectMessages 返回当前用户可见的消息。审核未通过的消息只对发送者可见，
+// 避免“未送达”消息通过会话详情或列表摘要泄漏给接收方。
+func visibleDirectMessages(conv *app.DirectConversation, viewerID int64) []app.DirectMessage {
+	messages := make([]app.DirectMessage, 0, len(conv.Messages))
+	for _, message := range conv.Messages {
+		if message.Status == "blocked" && message.SenderID != viewerID {
+			continue
+		}
+		messages = append(messages, message)
+	}
+	return messages
+}
+
+func directConversationUnread(conv *app.DirectConversation, viewerID int64) int {
+	unread := 0
+	for _, message := range conv.Messages {
+		if message.SenderID != viewerID && message.Status == "delivered" {
+			unread++
+		}
+	}
+	return unread
+}
+
 // directConversationItem 会话的对外展示结构（调用方需持有锁）。
 func directConversationItem(s *app.Store, conv *app.DirectConversation, viewerID int64) gin.H {
 	other := conv.MemberIDs[0]
 	if other == viewerID {
 		other = conv.MemberIDs[1]
 	}
-	return gin.H{"id": conv.ID, "other": s.PublicAccount(other), "unlocked": conv.GreetingBy[viewerID] && conv.GreetingBy[other], "messages": conv.Messages, "updated_at": conv.UpdatedAt}
+	messages := visibleDirectMessages(conv, viewerID)
+	updatedAt := conv.UpdatedAt
+	if len(messages) > 0 {
+		updatedAt = messages[len(messages)-1].CreatedAt
+	}
+	return gin.H{
+		"id":           conv.ID,
+		"other":        s.PublicAccount(other),
+		"unlocked":     conv.GreetingBy[viewerID] && conv.GreetingBy[other],
+		"messages":     messages,
+		"updated_at":   updatedAt,
+		"unread_count": directConversationUnread(conv, viewerID),
+	}
 }
 
 func (a *API) listDirectConversations(c *gin.Context) {
 	account := current(c)
 	items := []gin.H{}
+	unread := 0
 	a.store.MuRLock(func() {
 		for _, conv := range a.store.DirectConversations {
 			if !contains(conv.MemberIDs, account.ID) {
 				continue
 			}
-			items = append(items, directConversationItem(a.store, conv, account.ID))
+			item := directConversationItem(a.store, conv, account.ID)
+			items = append(items, item)
+			unread += item["unread_count"].(int)
 		}
 	})
-	c.JSON(200, gin.H{"items": items})
+	sort.Slice(items, func(i, j int) bool {
+		return items[i]["updated_at"].(time.Time).After(items[j]["updated_at"].(time.Time))
+	})
+	c.JSON(200, gin.H{"items": items, "unread": unread})
 }
 func (a *API) getDirectConversation(c *gin.Context) {
 	id, ok := idParam(c)
@@ -795,7 +839,17 @@ func (a *API) getDirectConversation(c *gin.Context) {
 		if other == account.ID {
 			other = conv.MemberIDs[1]
 		}
-		c.JSON(200, gin.H{"conversation": conv, "other": a.store.PublicAccount(other), "unlocked": conv.GreetingBy[account.ID] && conv.GreetingBy[other]})
+		item := directConversationItem(a.store, conv, account.ID)
+		c.JSON(200, gin.H{
+			"conversation": gin.H{
+				"id":           conv.ID,
+				"messages":     item["messages"],
+				"updated_at":   item["updated_at"],
+				"unread_count": item["unread_count"],
+			},
+			"other":    a.store.PublicAccount(other),
+			"unlocked": conv.GreetingBy[account.ID] && conv.GreetingBy[other],
+		})
 	})
 }
 func (a *API) sendDirectMessage(c *gin.Context) {
@@ -843,7 +897,7 @@ func (a *API) sendDirectMessage(c *gin.Context) {
 		}
 		msg = app.DirectMessage{ID: a.store.NextID(), SenderID: account.ID, Text: strings.TrimSpace(in.Text), System: in.System, Status: msgStatus, CreatedAt: time.Now()}
 		conv.Messages = append(conv.Messages, msg)
-		if in.System {
+		if in.System && msgStatus == "delivered" {
 			conv.GreetingBy[account.ID] = true
 		}
 		conv.UpdatedAt = time.Now()
@@ -1501,6 +1555,7 @@ func (a *API) adminProviders(c *gin.Context) {
 	})
 	c.JSON(200, gin.H{"items": items})
 }
+
 // providerInput 管理端 AI 服务入参；api_key 为真实密钥，仅用于服务端调用，响应中只回掩码。
 type providerInput struct {
 	Name          string `json:"name"`

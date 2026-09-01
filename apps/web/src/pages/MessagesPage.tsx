@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom'
 import Icon, { IconName } from '../components/Icon'
 import { api, AppNotification, formatTime } from '../api/client'
 import { useAuth } from '../store/auth'
-import { isConversationUnread, useDmRead } from '../store/unread'
 import styles from './MessagesPage.module.css'
 
 const notificationIcons: Record<AppNotification['type'], IconName> = {
@@ -21,21 +20,19 @@ export default function MessagesPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { account } = useAuth()
-  const { data } = useQuery({ queryKey: ['direct-conversations'], queryFn: api.listDirectConversations })
+  const { data } = useQuery({ queryKey: ['direct-conversations', account?.id], queryFn: api.listDirectConversations, refetchInterval: 5_000 })
   const conversations = data?.items ?? []
 
-  const { data: noticeData } = useQuery({ queryKey: ['notifications'], queryFn: api.notifications })
+  const { data: noticeData } = useQuery({ queryKey: ['notifications', account?.id], queryFn: api.notifications })
   const notifications = noticeData?.items ?? []
   const unread = noticeData?.unread ?? 0
 
   const markRead = useMutation({
     mutationFn: (ids: number[]) => api.markNotificationsRead(ids),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['notifications', account?.id] }),
   })
 
-  const dmLastRead = useDmRead((state) => state.dmLastRead)
-  const markConversationRead = useDmRead((state) => state.markConversationRead)
-  const unreadDm = conversations.filter((item) => isConversationUnread(item, account?.id, dmLastRead)).length
+  const unreadDm = data?.unread ?? 0
 
   const openNotification = (item: AppNotification) => {
     if (!item.read) markRead.mutate([item.id])
@@ -43,7 +40,6 @@ export default function MessagesPage() {
   }
 
   const openConversation = (id: number) => {
-    markConversationRead(id)
     navigate(`/messages/${id}`)
   }
 
@@ -51,7 +47,7 @@ export default function MessagesPage() {
     <>
       <header className={styles.pageHead}><div><h1>消息</h1><p>通知和私信都在这里。</p></div></header>
       <div className={styles.tabs} role="tablist" aria-label="消息分类">
-        <button role="tab" aria-selected={tab === 'chat'} className={tab === 'chat' ? styles.active : ''} onClick={() => setTab('chat')}>私信 {unreadDm > 0 ? <span>{unreadDm}</span> : <span>{conversations.length}</span>}</button>
+        <button role="tab" aria-selected={tab === 'chat'} className={tab === 'chat' ? styles.active : ''} onClick={() => setTab('chat')}>私信 {unreadDm > 0 && <span>{unreadDm}</span>}</button>
         <button role="tab" aria-selected={tab === 'notice'} className={tab === 'notice' ? styles.active : ''} onClick={() => setTab('notice')}>通知 {unread > 0 && <span>{unread}</span>}</button>
       </div>
 
@@ -83,7 +79,7 @@ export default function MessagesPage() {
           </div>
         ) : conversations.map((item) => {
           const last = item.messages[item.messages.length - 1]
-          const convUnread = isConversationUnread(item, account?.id, dmLastRead)
+          const convUnread = item.unread_count > 0
           return (
             <button key={item.id} className={styles.item} type="button" onClick={() => openConversation(item.id)}>
               <span className={styles.avatar}>{item.other.avatar || item.other.nickname.slice(0, 1)}</span>

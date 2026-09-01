@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import Icon from '../components/Icon'
 import PostCard from '../components/PostCard'
@@ -11,6 +11,7 @@ export default function PublicProfilePage() {
   const { userId } = useParams()
   const id = Number(userId)
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { account } = useAuth()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -31,6 +32,7 @@ export default function PublicProfilePage() {
     setError('')
     try {
       const { item } = await api.startDirectConversation(user.id)
+      void queryClient.invalidateQueries({ queryKey: ['direct-conversations', account?.id] })
       navigate(`/messages/${item.id}`)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '发起私信失败，请稍后重试')

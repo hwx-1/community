@@ -1,4 +1,4 @@
-.chatShell { min-height: calc(100vh - 112px); display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow-sm); }
+.chatShell { height: calc(100vh - 112px); display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow-sm); }
 
 .chatHead { min-height: 60px; padding: 10px 16px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border); background: var(--surface); }
 .chatHead > button { width: 34px; height: 34px; flex: 0 0 auto; padding: 0; display: grid; place-items: center; border: 0; border-radius: 50%; background: transparent; color: var(--text-muted); }
@@ -16,7 +16,7 @@
 .privacyNote { padding: 8px 16px; display: flex; align-items: center; justify-content: center; gap: 6px; border-bottom: 1px solid var(--border-light); color: var(--text-soft); background: var(--surface-subtle); font-size: 12px; }
 .privacyNote svg { width: 13px; }
 
-.messages { min-height: 380px; padding: 20px; flex: 1; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; background: var(--surface-subtle); }
+.messages { min-height: 0; padding: 20px; flex: 1; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; overscroll-behavior: contain; background: var(--surface-subtle); }
 
 .messageRow { display: flex; align-items: flex-end; gap: 8px; }
 .messageRow > div { max-width: 70%; display: flex; flex-direction: column; align-items: flex-start; }
@@ -46,7 +46,8 @@
 .composer svg { width: 17px; }
 
 @media (max-width: 720px) {
-  .chatShell { min-height: calc(100vh - 92px); margin: -4px -1px 0; border-radius: var(--r-md); }
+  /* 移动端：扣除顶栏 56、上间距 12 与固定底部导航，避免输入框被遮挡 */
+  .chatShell { height: calc(100vh - 56px - 12px - 76px - env(safe-area-inset-bottom)); margin: -4px -1px 0; border-radius: var(--r-md); }
   .messageRow > div { max-width: 78%; }
   .handshake { grid-template-columns: 28px 1fr; }
   .handshake button { grid-column: 1 / -1; }

@@ -1,1 +1,0 @@
-# Obfuscation is disabled for the campus community client.

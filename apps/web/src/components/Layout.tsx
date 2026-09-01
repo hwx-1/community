@@ -1,10 +1,9 @@
 import { FormEvent, useEffect, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import Icon, { IconName } from './Icon'
 import { api, formatTime } from '../api/client'
 import { useAuth } from '../store/auth'
-import { countUnreadConversations, useDmRead } from '../store/unread'
 import styles from './Layout.module.css'
 
 type Theme = 'light' | 'dark'
@@ -29,11 +28,14 @@ export default function Layout() {
   const [theme, setTheme] = useState<Theme>(initialTheme)
   const navigate = useNavigate()
   const location = useLocation()
+  const queryClient = useQueryClient()
   const { account, loaded, refresh } = useAuth()
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
     localStorage.setItem('xsnbb-theme', theme)
+    // 清理旧版仅按会话 ID 保存的本地已读时间；已读状态现已由服务端统一维护。
+    localStorage.removeItem('xsnbb-dm-read')
   }, [theme])
 
   useEffect(() => {
@@ -50,17 +52,33 @@ export default function Layout() {
     }
   }, [loaded, account, location.pathname, navigate])
 
+  // SSE 只传“数据已变化”信号，正文仍通过鉴权 REST 补拉；5 秒轮询保留为断线兜底。
+  useEffect(() => {
+    if (!account) return
+    const accountId = account.id
+    const events = new EventSource('/api/v1/events', { withCredentials: true })
+    const refreshMessages = () => {
+      void queryClient.invalidateQueries({ queryKey: ['notifications', accountId] })
+      void queryClient.invalidateQueries({ queryKey: ['direct-conversations', accountId] })
+      void queryClient.invalidateQueries({ queryKey: ['direct-conversation', accountId] })
+    }
+    events.addEventListener('refresh', refreshMessages)
+    return () => {
+      events.removeEventListener('refresh', refreshMessages)
+      events.close()
+    }
+  }, [account, queryClient])
+
   const submitSearch = (event: FormEvent) => {
     event.preventDefault()
     navigate(`/search${keyword.trim() ? `?q=${encodeURIComponent(keyword.trim())}` : ''}`)
   }
 
-  // 未读消息:通知未读(服务端)+ 私信未读(本地已读时间比对)
-  const { data: noticeData } = useQuery({ queryKey: ['notifications'], queryFn: api.notifications, enabled: !!account, refetchInterval: 30_000 })
-  const { data: convData } = useQuery({ queryKey: ['direct-conversations'], queryFn: api.listDirectConversations, enabled: !!account, refetchInterval: 30_000 })
-  const dmLastRead = useDmRead((state) => state.dmLastRead)
+  // 通知与私信未读数都以服务端返回值为准，所有端保持同一计数口径。
+  const { data: noticeData } = useQuery({ queryKey: ['notifications', account?.id], queryFn: api.notifications, enabled: !!account, refetchInterval: 30_000 })
+  const { data: convData } = useQuery({ queryKey: ['direct-conversations', account?.id], queryFn: api.listDirectConversations, enabled: !!account, refetchInterval: 5_000 })
   const unreadNotice = noticeData?.unread ?? 0
-  const unreadDm = countUnreadConversations(convData?.items ?? [], account?.id, dmLastRead)
+  const unreadDm = convData?.unread ?? 0
   const unreadTotal = unreadNotice + unreadDm
 
   if (!loaded || !account) {

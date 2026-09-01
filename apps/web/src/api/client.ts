@@ -111,6 +111,24 @@ export interface DirectConversationItem {
   unlocked: boolean
   messages: DirectMessage[]
   updated_at: string
+  unread_count: number
+}
+
+export interface DirectConversationsResponse {
+  items: DirectConversationItem[]
+  /** 当前用户所有会话中的未读消息总数 */
+  unread: number
+}
+
+export interface DirectConversationResponse {
+  conversation: {
+    id: number
+    messages: DirectMessage[]
+    updated_at: string
+    unread_count: number
+  }
+  other: PublicAccount
+  unlocked: boolean
 }
 
 export interface PublicSettings {
@@ -238,13 +256,15 @@ export const api = {
   publicSettings: () => request<PublicSettings>('GET', '/api/v1/settings/public'),
 
   // 私信
-  listDirectConversations: () => request<{ items: DirectConversationItem[] }>('GET', '/api/v1/direct-conversations'),
+  listDirectConversations: () => request<DirectConversationsResponse>('GET', '/api/v1/direct-conversations'),
   startDirectConversation: (userId: number) =>
     request<{ item: DirectConversationItem }>('POST', '/api/v1/direct-conversations', { user_id: userId }),
   getDirectConversation: (id: number) =>
-    request<{ conversation: { id: number; messages: DirectMessage[] }; other: PublicAccount; unlocked: boolean }>('GET', `/api/v1/direct-conversations/${id}`),
+    request<DirectConversationResponse>('GET', `/api/v1/direct-conversations/${id}`),
   sendDirectMessage: (id: number, text: string, system: boolean) =>
     request<{ message: DirectMessage; unlocked: boolean }>('POST', `/api/v1/direct-conversations/${id}/messages`, { text, system }),
+  markDirectConversationRead: (id: number) =>
+    request<{ unread: number }>('POST', `/api/v1/direct-conversations/${id}/read`, {}),
 
   // AI 问答
   aiModels: () => request<{ items: AIModel[] }>('GET', '/api/v1/ai/models'),

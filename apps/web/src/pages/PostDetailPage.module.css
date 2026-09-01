@@ -10,15 +10,43 @@
 .pageHead button:hover { color: var(--brand); }
 .pageHead svg { width: 15px; }
 
-/* 举报面板:白卡 + 胶囊原因按钮 */
-.reportBox { padding: 16px 18px; display: flex; gap: 12px; border-radius: var(--r-md); background: var(--surface); box-shadow: var(--shadow-sm); }
-.reportBox > svg { width: 20px; flex: 0 0 auto; margin-top: 2px; color: var(--brand); }
-.reportBox strong { font-size: 14px; }
-.reportBox p { margin: 4px 0 10px; color: var(--text-muted); font-size: 13px; line-height: 1.6; }
-.reportBox div > p:last-child { margin-bottom: 0; }
-.reportActions { display: flex; flex-wrap: wrap; gap: 8px; }
-.reportActions button { height: 30px; padding: 0 14px; border: 1px solid var(--border); border-radius: var(--r-pill); background: var(--surface); color: var(--text-muted); font-size: 13px; }
-.reportActions button:hover { border-color: var(--brand); color: var(--brand); }
+/* 知乎式举报弹窗:遮罩 + 居中卡片,单选原因 + 补充说明 */
+.reportMask { position: fixed; inset: 0; z-index: 80; padding: 20px; display: grid; place-items: center; background: rgba(18, 18, 18, .45); }
+.reportDialog { width: 100%; max-width: 420px; overflow: hidden; border-radius: var(--r-md); background: var(--surface); box-shadow: 0 16px 48px rgba(18, 18, 18, .18); }
+.reportHead { height: 52px; padding: 0 8px 0 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-light); }
+.reportHead strong { font-size: 15px; font-weight: 600; }
+.reportHead button { width: 34px; height: 34px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 50%; background: transparent; color: var(--text-muted); }
+.reportHead button:hover { background: var(--surface-subtle); color: var(--text); }
+.reportHead svg { width: 16px; }
+.reportBody { padding: 14px 18px 18px; }
+.reportTip { margin: 0 0 10px; color: var(--text-muted); font-size: 13px; line-height: 1.6; }
+.reasonList { display: flex; flex-direction: column; }
+.reasonList label { margin: 0 -8px; padding: 9px 8px; display: flex; align-items: center; gap: 10px; border-radius: var(--r-sm); color: var(--text); font-size: 14px; cursor: pointer; }
+.reasonList label:hover { background: var(--surface-subtle); }
+.reasonList input { width: 15px; height: 15px; margin: 0; accent-color: var(--brand); }
+.reasonOn { font-weight: 600; }
+.reportBody textarea { width: 100%; min-height: 68px; margin-top: 10px; padding: 10px 12px; resize: vertical; border: 1px solid var(--border); border-radius: var(--r-sm); outline: 0; background: var(--surface-subtle); font-size: 13px; line-height: 1.6; box-sizing: border-box; }
+.reportBody textarea:focus { border-color: var(--brand); background: var(--surface); }
+.reportError { margin: 8px 0 0; color: var(--danger); font-size: 12px; }
+.reportFoot { padding: 12px 18px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--border-light); }
+.reportFoot button { height: 32px; padding: 0 16px; border-radius: var(--r-pill); font-size: 13px; font-weight: 600; }
+.reportFoot button:first-child { border: 1px solid var(--border); background: var(--surface); color: var(--text-muted); }
+.reportFoot button:first-child:hover { color: var(--text); }
+.reportFoot button:last-child { border: 0; color: #fff; background: var(--brand); }
+.reportFoot button:last-child:hover:not(:disabled) { background: var(--brand-hover); }
+.reportFoot button:disabled { opacity: .5; cursor: not-allowed; }
+.reportDone { padding: 28px 24px 24px; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+.reportDone > svg { width: 34px; height: 34px; padding: 8px; border-radius: 50%; color: #fff; background: var(--brand); box-sizing: content-box; }
+.reportDone p { margin: 0; color: var(--text-muted); font-size: 13px; line-height: 1.7; }
+.reportDone button { height: 32px; padding: 0 24px; border: 0; border-radius: var(--r-pill); color: #fff; background: var(--brand); font-size: 13px; font-weight: 600; }
+.reportDone button:hover { background: var(--brand-hover); }
+
+/* 回复目标条:抖音式“回复 @xx”提示 */
+.replyBar { margin-bottom: 8px; padding: 7px 10px; display: flex; align-items: center; gap: 8px; border-radius: var(--r-sm); background: var(--brand-soft); color: var(--brand-dark); font-size: 12px; }
+.replyBar > span { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.replyBar button { width: 20px; height: 20px; flex: 0 0 auto; padding: 0; display: grid; place-items: center; border: 0; border-radius: 50%; background: transparent; color: var(--brand); }
+.replyBar button:hover { background: var(--brand-border); }
+.replyBar svg { width: 11px; }
 
 /* 评论输入区:头像 + 灰底圆角 textarea + 红色胶囊提交 */
 .commentComposer { padding: 18px 20px; display: flex; align-items: flex-start; gap: 12px; border-radius: var(--r-md); background: var(--surface); box-shadow: var(--shadow-sm); }
@@ -48,15 +76,20 @@
 .commentMeta > span { color: var(--text-soft); font-size: 12px; }
 .commentMeta em { padding: 2px 8px; border-radius: var(--r-pill); color: var(--brand); background: var(--brand-soft); font-size: 11px; font-style: normal; }
 .commentBody > p { margin: 6px 0; font-size: 15px; line-height: 1.7; }
+.commentText { cursor: pointer; }
 .deleted { color: var(--text-soft); }
 .commentActions { display: flex; gap: 14px; }
 .commentActions button { padding: 0; border: 0; background: transparent; color: var(--text-soft); font-size: 12px; }
 .commentActions button:hover { color: var(--brand); }
-.replies { margin-top: 10px; padding: 10px 12px; border-radius: var(--r-sm); background: var(--surface-subtle); }
-.replies p { margin: 4px 0; font-size: 13px; line-height: 1.6; }
-.replies strong { font-weight: 600; }
-.replies small { margin-left: 8px; color: var(--text-soft); font-size: 11px; }
-.replyClosed { display: flex; align-items: center; gap: 5px; margin-top: 6px; color: var(--text-soft); font-size: 11px; }
+
+/* 抖音式回复列表:左缩进、小头像、独立评论行,可继续点击唤起回复 */
+.replies { margin-top: 12px; padding-left: 4px; display: flex; flex-direction: column; gap: 14px; }
+.reply { display: flex; align-items: flex-start; gap: 10px; }
+.replyBody { min-width: 0; flex: 1; }
+.replyBody > p { margin: 4px 0; font-size: 14px; line-height: 1.6; }
+.avatarSm { width: 26px; height: 26px; font-size: 11px; }
+.replyToTag { color: var(--text-soft); font-size: 12px; }
+.replyClosed { display: flex; align-items: center; gap: 5px; margin-top: 2px; color: var(--text-soft); font-size: 11px; }
 .replyClosed svg { width: 12px; }
 
 /* 空态 */
