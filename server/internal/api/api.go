@@ -1705,10 +1705,20 @@ func countAnswersTodayUnlocked(items map[int64]*app.Conversation, owner int64) i
 	}
 	return count
 }
+// shanghaiLoc 额度统计使用的业务时区。优先加载 IANA 时区数据；
+// 运行镜像缺 tzdata 时 LoadLocation 会返回 nil Location，
+// 直接 t.In(nil) 会 panic（曾导致 AI 问答接口 500），故兜底为固定 +8 时区。
+var shanghaiLoc = func() *time.Location {
+	loc, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil || loc == nil {
+		return time.FixedZone("CST", 8*3600)
+	}
+	return loc
+}()
+
 func sameDay(a, b time.Time) bool {
-	loc, _ := time.LoadLocation("Asia/Shanghai")
-	ay, am, ad := a.In(loc).Date()
-	by, bm, bd := b.In(loc).Date()
+	ay, am, ad := a.In(shanghaiLoc).Date()
+	by, bm, bd := b.In(shanghaiLoc).Date()
 	return ay == by && am == bm && ad == bd
 }
 func lastAudits(items []app.AuditLog, n int) []app.AuditLog {

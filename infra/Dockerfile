@@ -26,6 +26,9 @@ RUN cd server && CGO_ENABLED=0 go build -trimpath -o /xsnbb-api ./cmd/api
 
 # ---- 阶段 3：运行镜像 ----
 FROM alpine:3.20
+# tzdata 必需：Go 的 time.LoadLocation("Asia/Shanghai") 依赖系统时区数据，
+# alpine 默认不带，缺失会导致 AI 问答额度统计 panic（接口 500）
+RUN apk add --no-cache tzdata
 RUN adduser -D xsnbb && mkdir -p /data/uploads && chown xsnbb /data/uploads
 WORKDIR /app
 COPY --from=backend /xsnbb-api /app/xsnbb-api
