@@ -2,7 +2,9 @@ import { FormEvent, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import Icon from '../components/Icon'
+import { Avatar } from '../components/Avatar'
 import { api, AIConversation, ApiError } from '../api/client'
+import { formatAIAnswer } from '../utils/formatAI'
 import { useAuth } from '../store/auth'
 import styles from './ToolDetailPage.module.css'
 
@@ -110,9 +112,9 @@ export default function AIPage() {
         )}
         {(current?.messages ?? []).map((message) => (
           <div key={message.id} className={message.role === 'user' ? styles.aiUser : styles.aiAnswer}>
-            <span>{message.role === 'user' ? (account?.avatar || '我') : <Icon name="sparkles" />}</span>
+            <span>{message.role === 'user' ? <Avatar value={account?.avatar} fallback={account?.nickname.slice(0, 1) || '我'} /> : <Icon name="sparkles" />}</span>
             <div>
-              <p>{message.text}</p>
+              <p>{message.role === 'assistant' ? formatAIAnswer(message.text) : message.text}</p>
               {message.model && <footer><span>由 {message.model} 回答</span>{message.source && <button type="button"><Icon name="file" />{message.source}</button>}</footer>}
               {message.needs_feedback && (
                 <div className={styles.aiFeedback} role="group" aria-label="答案确认">

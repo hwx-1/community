@@ -2,11 +2,14 @@ package app
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
 func TestSnapshotPreservesInternalFields(t *testing.T) {
 	s := &Store{
+		Sessions:            map[string]int64{"user-token": 7},
+		AdminSessions:       map[string]string{"admin-token": "root"},
 		Accounts:            map[int64]*Account{7: {ID: 7, PasswordHash: "user-hash"}},
 		Admins:              map[string]*AdminAccount{"root": {Username: "root", PasswordHash: "admin-hash"}},
 		Providers:           map[int64]*AIProvider{8: {ID: 8, APIKey: "provider-key"}},
@@ -31,5 +34,13 @@ func TestSnapshotPreservesInternalFields(t *testing.T) {
 	}
 	if got.ReportReporterIDs[10] != 7 || got.NotificationAccountIDs[11] != 7 {
 		t.Fatal("reporter or notification owner was omitted")
+	}
+	// 用户会话必须随快照持久化：部署重启不应把在线用户踢下线
+	if got.Sessions["user-token"] != 7 {
+		t.Fatal("user sessions must survive snapshot round-trip")
+	}
+	// 管理员会话保持易失：重启后需重新登录，缩小令牌暴露面
+	if raw2, _ := json.Marshal(got); strings.Contains(string(raw2), "admin-token") {
+		t.Fatal("admin sessions must not be persisted")
 	}
 }

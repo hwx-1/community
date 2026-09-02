@@ -50,11 +50,13 @@ type Store struct {
 	Appeals       map[int64]*Appeal
 }
 
-// storeSnapshot intentionally excludes login/admin sessions and SMS codes:
-// those are short-lived security state and must not survive a process restart.
-// Everything users or administrators create or change is durable.
+// storeSnapshot 持久化用户登录会话（Sessions）：部署重启不应把在线用户踢下线，
+// Cookie 有效期 7 天，服务端会话需同样存活才有意义。
+// AdminSessions 与 SMSCodes 仍是易失安全状态：管理员在重启后需重新登录（缩小令牌暴露面），
+// 短信验证码短时效无需持久化。其余用户与管理员产生的内容均为持久数据。
 type storeSnapshot struct {
 	NextID                 int64                         `json:"next_id"`
+	Sessions               map[string]int64              `json:"sessions"`
 	Accounts               map[int64]*Account            `json:"accounts"`
 	Phones                 map[string]int64              `json:"phones"`
 	Posts                  map[int64]*Post               `json:"posts"`
@@ -542,7 +544,7 @@ func (s *Store) DeleteSession(t string) {
 
 func (s *Store) snapshot() storeSnapshot {
 	snap := storeSnapshot{
-		NextID: s.nextID, Accounts: s.Accounts, Phones: s.Phones, Posts: s.Posts,
+		NextID: s.nextID, Sessions: s.Sessions, Accounts: s.Accounts, Phones: s.Phones, Posts: s.Posts,
 		Comments: s.Comments, Verifications: s.Verifications, Announcements: s.Announcements,
 		Tools: s.Tools, Providers: s.Providers, AIConversations: s.AIConversations,
 		DirectConversations: s.DirectConversations, AuditLogs: s.AuditLogs, Admins: s.Admins,
@@ -606,6 +608,9 @@ func (s *Store) loadSnapshot() (bool, error) {
 		return false, fmt.Errorf("decode snapshot: %w", err)
 	}
 	s.nextID = snap.NextID
+	if snap.Sessions != nil {
+		s.Sessions = snap.Sessions
+	}
 	s.Accounts, s.Phones, s.Posts, s.Comments = snap.Accounts, snap.Phones, snap.Posts, snap.Comments
 	s.Verifications, s.Announcements, s.Tools = snap.Verifications, snap.Announcements, snap.Tools
 	s.Providers, s.AIConversations = snap.Providers, snap.AIConversations

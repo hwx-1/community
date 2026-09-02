@@ -46,12 +46,12 @@
 
 .aiUser, .aiAnswer { display: flex; align-items: flex-start; gap: 10px; }
 .aiUser { justify-content: flex-end; }
-.aiUser > span, .aiAnswer > span { width: 32px; height: 32px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 50%; font-size: 12px; font-weight: 600; }
+.aiUser > span, .aiAnswer > span { width: 32px; height: 32px; flex: 0 0 auto; display: grid; place-items: center; overflow: hidden; border-radius: 50%; font-size: 12px; font-weight: 600; }
 .aiUser > span { order: 2; color: var(--brand-dark); background: var(--brand-soft); }
 .aiAnswer > span { color: #fff; background: var(--brand); }
 .aiAnswer > span svg { width: 16px; }
 .aiUser > div, .aiAnswer > div { max-width: 78%; }
-.aiUser p, .aiAnswer p { margin: 0; padding: 10px 14px; border-radius: var(--r-lg) var(--r-lg) var(--r-lg) 4px; background: var(--surface); color: var(--text); font-size: 14px; line-height: 1.7; box-shadow: var(--shadow-sm); }
+.aiUser p, .aiAnswer p { margin: 0; padding: 10px 14px; border-radius: var(--r-lg) var(--r-lg) var(--r-lg) 4px; background: var(--surface); color: var(--text); font-size: 14px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; box-shadow: var(--shadow-sm); }
 .aiUser p { border-radius: var(--r-lg) var(--r-lg) 4px var(--r-lg); color: #fff; background: var(--brand); box-shadow: none; }
 .aiAnswer footer { margin-top: 6px; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; color: var(--text-soft); font-size: 12px; }
 .aiAnswer footer button { padding: 3px 9px; display: inline-flex; align-items: center; gap: 4px; border: 0; border-radius: var(--r-pill); color: var(--brand); background: var(--brand-soft); font-size: 12px; }
