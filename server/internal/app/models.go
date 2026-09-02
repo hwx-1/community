@@ -138,7 +138,11 @@ type AIMessage struct {
 	Text      string    `json:"text"`
 	Model     string    `json:"model,omitempty"`
 	Source    string    `json:"source,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
+	// NeedsFeedback 为 true 表示这是知识库直接命中的答案，等待用户确认
+	// 「这个答案是你想要的吗？」；确认后清零并记录 Feedback（"yes"/"no"）。
+	NeedsFeedback bool      `json:"needs_feedback,omitempty"`
+	Feedback      string    `json:"feedback,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 type DirectConversation struct {
 	ID         int64           `json:"id"`

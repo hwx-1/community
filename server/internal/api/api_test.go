@@ -389,3 +389,91 @@ func TestCapabilitiesExposeDevMode(t *testing.T) {
 		t.Fatal("expected sms dev_mode=true without credentials")
 	}
 }
+
+func TestAIFeedbackFlow(t *testing.T) {
+	srv := newTestServer(t)
+	defer srv.Close()
+	c := newClient(t, srv.URL)
+	c.login(t, "13800000000", "Demo12345")
+
+	newKBConversation := func() (int64, map[string]any) {
+		t.Helper()
+		status, body := c.do(http.MethodPost, "/api/v1/ai/conversations", map[string]string{"title": ""})
+		if status != http.StatusCreated {
+			t.Fatalf("create conversation failed: %d %v", status, body)
+		}
+		convID := int64(body["conversation"].(map[string]any)["id"].(float64))
+		status, body = c.do(http.MethodPost, fmt.Sprintf("/api/v1/ai/conversations/%d/messages", convID), map[string]string{"text": "教务处电话是多少"})
+		if status != http.StatusOK {
+			t.Fatalf("ask failed: %d %v", status, body)
+		}
+		return convID, body["answer"].(map[string]any)
+	}
+
+	// 1) 知识库命中的答案必须带 needs_feedback 标记与来源标注
+	convID, answer := newKBConversation()
+	if answer["needs_feedback"] != true {
+		t.Fatalf("KB 答案应标记 needs_feedback，got %v", answer)
+	}
+	if source, _ := answer["source"].(string); !strings.Contains(source, "校内资料") {
+		t.Fatalf("KB 答案应标注校内资料来源，got %v", answer["source"])
+	}
+	answerID := int64(answer["id"].(float64))
+
+	// 2) 确认「是」：仅标记确认，不产生新答案
+	status, body := c.do(http.MethodPost, fmt.Sprintf("/api/v1/ai/conversations/%d/messages/%d/feedback", convID, answerID), map[string]bool{"satisfied": true})
+	if status != http.StatusOK {
+		t.Fatalf("feedback yes failed: %d %v", status, body)
+	}
+	if _, exists := body["answer"]; exists {
+		t.Fatal("确认满意不应返回新答案")
+	}
+	status, body = c.do(http.MethodGet, "/api/v1/ai/conversations", nil)
+	msgs := body["items"].([]any)[0].(map[string]any)["messages"].([]any)
+	if len(msgs) != 2 {
+		t.Fatalf("确认满意后会话应保持 2 条消息，got %d", len(msgs))
+	}
+	confirmed := msgs[1].(map[string]any)
+	if confirmed["needs_feedback"] == true || confirmed["feedback"] != "yes" {
+		t.Fatalf("确认状态未持久化：%v", confirmed)
+	}
+
+	// 3) 重复反馈同一答案应 404（幂等保护）
+	status, _ = c.do(http.MethodPost, fmt.Sprintf("/api/v1/ai/conversations/%d/messages/%d/feedback", convID, answerID), map[string]bool{"satisfied": true})
+	if status != http.StatusNotFound {
+		t.Fatalf("重复反馈应 404，got %d", status)
+	}
+
+	// 4) 确认「否」：跳过知识库，走外部管线重新作答并追加新消息
+	convID2, answer2 := newKBConversation()
+	answerID2 := int64(answer2["id"].(float64))
+	status, body = c.do(http.MethodPost, fmt.Sprintf("/api/v1/ai/conversations/%d/messages/%d/feedback", convID2, answerID2), map[string]bool{"satisfied": false})
+	if status != http.StatusOK {
+		t.Fatalf("feedback no failed: %d %v", status, body)
+	}
+	retry, exists := body["answer"].(map[string]any)
+	if !exists || retry["text"] == "" {
+		t.Fatalf("否认后应返回新答案，got %v", body)
+	}
+	if source, _ := retry["source"].(string); strings.Contains(source, "校内资料") {
+		t.Fatalf("重答应跳过知识库，got source=%v", retry["source"])
+	}
+	if retry["needs_feedback"] == true {
+		t.Fatal("重答的答案不应再要求确认")
+	}
+	status, body = c.do(http.MethodGet, "/api/v1/ai/conversations", nil)
+	for _, item := range body["items"].([]any) {
+		conv := item.(map[string]any)
+		if int64(conv["id"].(float64)) != convID2 {
+			continue
+		}
+		msgs := conv["messages"].([]any)
+		if len(msgs) != 3 {
+			t.Fatalf("否认后会话应有 3 条消息（提问/知识库答案/重答），got %d", len(msgs))
+		}
+		kbMsg := msgs[1].(map[string]any)
+		if kbMsg["needs_feedback"] == true || kbMsg["feedback"] != "no" {
+			t.Fatalf("原知识库答案应标记 feedback=no：%v", kbMsg)
+		}
+	}
+}

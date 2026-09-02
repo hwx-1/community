@@ -85,6 +85,8 @@ export interface AIMessage {
   text: string
   model?: string
   source?: string
+  needs_feedback?: boolean
+  feedback?: 'yes' | 'no'
   created_at: string
 }
 
@@ -274,6 +276,8 @@ export const api = {
   deleteAIConversation: (id: number) => request<void>('DELETE', `/api/v1/ai/conversations/${id}`),
   askAI: (id: number, text: string, model?: string) =>
     request<{ user_message: AIMessage; answer: AIMessage; remaining: number }>('POST', `/api/v1/ai/conversations/${id}/messages`, { text, model }),
+  aiFeedback: (id: number, mid: number, satisfied: boolean) =>
+    request<{ answer?: AIMessage; remaining: number }>('POST', `/api/v1/ai/conversations/${id}/messages/${mid}/feedback`, { satisfied }),
 
   // 上传
   upload: async (file: File): Promise<{ url: string; dev_mode: boolean }> => {

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -111,6 +112,7 @@ func (a *API) Register(r *gin.Engine) {
 	act.POST("/ai/conversations", a.csrf(), a.createAIConversation)
 	act.DELETE("/ai/conversations/:id", a.csrf(), a.deleteAIConversation)
 	act.POST("/ai/conversations/:id/messages", a.csrf(), a.askAI)
+	act.POST("/ai/conversations/:id/messages/:mid/feedback", a.csrf(), a.aiFeedback)
 
 	admin := v1.Group("/admin")
 	admin.POST("/auth/login", a.adminLogin)
@@ -1052,7 +1054,7 @@ func (a *API) askAI(c *gin.Context) {
 				continue
 			}
 			if kbMatch(e, question) {
-				answer := app.AIMessage{ID: a.store.NextID(), Role: "assistant", Text: e.Content, Model: model, Source: fmt.Sprintf("校内资料 · %s（%s）", e.Source, e.SourceDate), CreatedAt: now}
+				answer := app.AIMessage{ID: a.store.NextID(), Role: "assistant", Text: e.Content, Model: model, Source: fmt.Sprintf("校内资料 · %s（%s）", e.Source, e.SourceDate), NeedsFeedback: true, CreatedAt: now}
 				conv.Messages = append(conv.Messages, user, answer)
 				conv.Model = model
 				if conv.Title == "新会话" {
@@ -1079,31 +1081,7 @@ func (a *API) askAI(c *gin.Context) {
 
 	// 第二阶段（不持锁）：依次调用 AI 服务（OpenAI 兼容协议）；
 	// 全部失败再退回联网检索适配层，最后退回本地开发回答。
-	answerText, source := "", ""
-	if len(providers) > 0 {
-		messages := buildChatMessages(history)
-		for _, p := range providers {
-			text, err := a.adapters.AI.Chat(c.Request.Context(), p.BaseURL, p.APIKey, p.Model, messages)
-			if err != nil || strings.TrimSpace(text) == "" {
-				continue
-			}
-			answerText = text
-			source = fmt.Sprintf("AI 服务 · %s", p.Name)
-			break
-		}
-	}
-	needRecord := false
-	if answerText == "" {
-		if searchResult, err := a.adapters.Search.Search(c.Request.Context(), question); err == nil && searchResult != "" {
-			answerText = searchResult
-			source = "联网检索"
-		} else {
-			answerText = "本地开发回答：校内资料未覆盖该问题，且联网检索服务未配置。该问题已记录到后台「待补充问题」，管理员补充答案后会在消息页通知你。"
-			source = "本地开发模式"
-		}
-		// 知识库与大模型都没答上的问题，记录待补充等待管理员补充
-		needRecord = true
-	}
+	answerText, source, needRecord := a.generateAnswer(c.Request.Context(), question, history, providers)
 
 	// 第三阶段（持锁）：会话可能在等待期间被删除；追加回答并按需记录待补充问题
 	a.store.MuLock(func() {
@@ -1118,6 +1096,120 @@ func (a *API) askAI(c *gin.Context) {
 			recordPendingQuestion(a.store, account.ID, question)
 		}
 		c.JSON(200, gin.H{"user_message": user, "answer": answer, "remaining": remaining - 1})
+	})
+}
+
+// generateAnswer 非知识库回答管线：大模型服务（按优先级）→ 联网检索 → 本地兜底。
+// 返回回答文本、来源标注，以及是否需要记录到后台「待补充问题」。
+func (a *API) generateAnswer(ctx context.Context, question string, history []app.AIMessage, providers []app.AIProvider) (text, source string, needRecord bool) {
+	if len(providers) > 0 {
+		messages := buildChatMessages(history)
+		for _, p := range providers {
+			t, err := a.adapters.AI.Chat(ctx, p.BaseURL, p.APIKey, p.Model, messages)
+			if err != nil || strings.TrimSpace(t) == "" {
+				continue
+			}
+			return t, fmt.Sprintf("AI 服务 · %s", p.Name), false
+		}
+	}
+	if searchResult, err := a.adapters.Search.Search(ctx, question); err == nil && searchResult != "" {
+		// 联网检索结果未经校内核实，仍记录待补充等待管理员确认
+		return searchResult, "联网检索", true
+	}
+	return "本地开发回答：校内资料未覆盖该问题，且联网检索服务未配置。该问题已记录到后台「待补充问题」，管理员补充答案后会在消息页通知你。", "本地开发模式", true
+}
+
+// aiFeedback 处理知识库答案的用户确认：
+// satisfied=true 仅标记确认；satisfied=false 跳过知识库，走大模型/联网检索管线重新作答。
+func (a *API) aiFeedback(c *gin.Context) {
+	convID, ok := idParam(c)
+	if !ok {
+		return
+	}
+	mid, err := strconv.ParseInt(c.Param("mid"), 10, 64)
+	if err != nil {
+		fail(c, 400, "INVALID_ID", "无效的资源编号")
+		return
+	}
+	account := current(c)
+	var in struct {
+		Satisfied bool `json:"satisfied"`
+	}
+	if c.ShouldBindJSON(&in) != nil {
+		fail(c, 422, "FEEDBACK_INVALID", "反馈内容无效")
+		return
+	}
+
+	// 第一阶段（持锁）：定位待确认的知识库答案及其对应的用户提问；
+	// 满意则直接标记完成，不满意则快照历史与可用服务后释放锁再走外部管线。
+	var (
+		question  string
+		model     string
+		remaining int
+		history   []app.AIMessage
+		providers []app.AIProvider
+		failed    bool
+	)
+	a.store.MuLock(func() {
+		conv, exists := a.store.AIConversations[convID]
+		if !exists || conv.OwnerID != account.ID {
+			fail(c, 404, "CONVERSATION_NOT_FOUND", "会话不存在")
+			failed = true
+			return
+		}
+		idx := -1
+		for i := range conv.Messages {
+			if conv.Messages[i].ID == mid {
+				idx = i
+				break
+			}
+		}
+		if idx < 0 || conv.Messages[idx].Role != "assistant" || !conv.Messages[idx].NeedsFeedback {
+			fail(c, 404, "FEEDBACK_TARGET_NOT_FOUND", "该答案不存在或已确认过")
+			failed = true
+			return
+		}
+		// 找到答案对应的用户提问（它之前最近的一条 user 消息）
+		for i := idx - 1; i >= 0; i-- {
+			if conv.Messages[i].Role == "user" {
+				question = conv.Messages[i].Text
+				break
+			}
+		}
+		model = conv.Model
+		remaining = 10 - countAnswersTodayUnlocked(a.store.AIConversations, account.ID)
+		if in.Satisfied {
+			conv.Messages[idx].NeedsFeedback = false
+			conv.Messages[idx].Feedback = "yes"
+			c.JSON(200, gin.H{"message": conv.Messages[idx], "remaining": remaining})
+			failed = true // 已响应，不再走重答管线
+			return
+		}
+		conv.Messages[idx].NeedsFeedback = false
+		conv.Messages[idx].Feedback = "no"
+		history = append(history, conv.Messages...)
+		providers = enabledProviders(a.store.Providers, model)
+	})
+	if failed {
+		return
+	}
+
+	// 第二阶段（不持锁）：跳过知识库，直接走大模型 → 联网检索 → 本地兜底
+	answerText, source, needRecord := a.generateAnswer(c.Request.Context(), question, history, providers)
+
+	// 第三阶段（持锁）：追加新答案并按需记录待补充问题
+	a.store.MuLock(func() {
+		conv, exists := a.store.AIConversations[convID]
+		if !exists || conv.OwnerID != account.ID {
+			fail(c, 404, "CONVERSATION_NOT_FOUND", "会话不存在")
+			return
+		}
+		answer := app.AIMessage{ID: a.store.NextID(), Role: "assistant", Text: answerText, Model: model, Source: source, CreatedAt: time.Now()}
+		conv.Messages = append(conv.Messages, answer)
+		if needRecord {
+			recordPendingQuestion(a.store, account.ID, question)
+		}
+		c.JSON(200, gin.H{"answer": answer, "remaining": remaining - 1})
 	})
 }
 

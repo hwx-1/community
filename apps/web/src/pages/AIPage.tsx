@@ -16,6 +16,7 @@ export default function AIPage() {
   const [model, setModel] = useState('')
   const [input, setInput] = useState('')
   const [thinking, setThinking] = useState(false)
+  const [feedbackPending, setFeedbackPending] = useState<number | null>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [error, setError] = useState('')
 
@@ -44,6 +45,20 @@ export default function AIPage() {
       setError(err instanceof ApiError ? err.message : '问答服务异常，请稍后重试')
     } finally {
       setThinking(false)
+    }
+  }
+
+  const sendFeedback = async (messageId: number, satisfied: boolean) => {
+    if (!current || feedbackPending !== null) return
+    setError('')
+    setFeedbackPending(messageId)
+    try {
+      await api.aiFeedback(current.id, messageId, satisfied)
+      await refetch()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : '反馈提交失败，请稍后重试')
+    } finally {
+      setFeedbackPending(null)
     }
   }
 
@@ -96,7 +111,20 @@ export default function AIPage() {
         {(current?.messages ?? []).map((message) => (
           <div key={message.id} className={message.role === 'user' ? styles.aiUser : styles.aiAnswer}>
             <span>{message.role === 'user' ? (account?.avatar || '我') : <Icon name="sparkles" />}</span>
-            <div><p>{message.text}</p>{message.model && <footer><span>由 {message.model} 回答</span>{message.source && <button type="button"><Icon name="file" />{message.source}</button>}</footer>}</div>
+            <div>
+              <p>{message.text}</p>
+              {message.model && <footer><span>由 {message.model} 回答</span>{message.source && <button type="button"><Icon name="file" />{message.source}</button>}</footer>}
+              {message.needs_feedback && (
+                <div className={styles.aiFeedback} role="group" aria-label="答案确认">
+                  <small>本地知识库的这个答案是你想要的吗？</small>
+                  <button type="button" disabled={feedbackPending !== null} onClick={() => void sendFeedback(message.id, true)}>是</button>
+                  <button type="button" className={styles.aiFeedbackNo} disabled={feedbackPending !== null} onClick={() => void sendFeedback(message.id, false)}>
+                    {feedbackPending === message.id ? '正在联网搜索…' : '否，联网搜索'}
+                  </button>
+                </div>
+              )}
+              {message.feedback === 'yes' && <small className={styles.aiFeedbackDone}>已确认：知识库答案有帮助</small>}
+            </div>
           </div>
         ))}
         {thinking && <div className={styles.aiAnswer}><span><Icon name="sparkles" /></span><div className={styles.thinking}><i /><i /><i /><small>正在查找校内资料…</small></div></div>}

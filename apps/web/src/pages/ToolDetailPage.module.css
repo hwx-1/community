@@ -57,6 +57,16 @@
 .aiAnswer footer button { padding: 3px 9px; display: inline-flex; align-items: center; gap: 4px; border: 0; border-radius: var(--r-pill); color: var(--brand); background: var(--brand-soft); font-size: 12px; }
 .aiAnswer footer svg { width: 12px; }
 
+/* 知识库答案确认：小字询问 + 是/否按钮 */
+.aiFeedback { margin-top: 8px; padding: 10px 12px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; border: 1px dashed var(--border-light); border-radius: var(--r-md); background: var(--surface-subtle); }
+.aiFeedback small { flex: 1 1 100%; color: var(--text-soft); font-size: 12px; }
+.aiFeedback button { height: 30px; padding: 0 14px; border: 0; border-radius: var(--r-pill); color: #fff; background: var(--brand); font-size: 12px; font-weight: 600; }
+.aiFeedback button:hover { background: var(--brand-hover); }
+.aiFeedback button:disabled { opacity: .4; }
+.aiFeedback .aiFeedbackNo { color: var(--brand); background: var(--brand-soft); }
+.aiFeedback .aiFeedbackNo:hover { background: var(--brand-soft); filter: brightness(.96); }
+.aiFeedbackDone { margin-top: 6px; display: inline-block; color: var(--text-soft); font-size: 12px; }
+
 .thinking { min-height: 42px; padding: 10px 14px; display: flex; align-items: center; gap: 4px; border-radius: var(--r-lg) var(--r-lg) var(--r-lg) 4px; background: var(--surface); box-shadow: var(--shadow-sm); }
 .thinking i { width: 5px; height: 5px; border-radius: 50%; background: var(--brand); animation: pulse 1s infinite alternate; }
 .thinking i:nth-child(2) { animation-delay: .2s; }
