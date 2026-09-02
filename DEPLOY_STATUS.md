@@ -136,7 +136,7 @@ df -h && free -h
 - 凭据：RAM 子用户（自定义最小权限策略，仅该 Bucket 的 Put/Get/Delete），存于 `infra/.env` 的 `OSS_*` 四项
 - 验收：`/api/v1/capabilities` 返回 `"oss":{"dev_mode":false}`，新上传图片 URL 为 `https://xsnbb-img.oss-cn-beijing.aliyuncs.com/...`
 - 兼容：切换前上传的本地图片继续由 `/uploads/` 路径访问，无需迁移
-- 后续可选：接入 CDN 自定义域名（如 img.xsnbb.xyz），代码已预留，改 `publicBase` 一处即可
+- CDN：已接入 ✅ 加速域名 `img.xsnbb.xyz`（回源 OSS Bucket，按流量计费，免费 DV 证书 3 个月自动轮换入口在云盾 SSL 证书服务）；新上传图片 URL 为 `https://img.xsnbb.xyz/...`，由 `OSS_PUBLIC_BASE` 环境变量控制
 
 ## 九、未完成事项
 
