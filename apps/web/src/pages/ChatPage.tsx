@@ -2,6 +2,7 @@ import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import Icon from '../components/Icon'
+import { Avatar } from '../components/Avatar'
 import { api, ApiError, DirectConversationResponse, DirectConversationsResponse, formatTime } from '../api/client'
 import { useAuth } from '../store/auth'
 import styles from './ChatPage.module.css'
@@ -145,7 +146,7 @@ export default function ChatPage() {
     <section className={styles.chatShell}>
       <header className={styles.chatHead}>
         <button type="button" onClick={() => navigate('/messages')} aria-label="返回消息"><Icon name="arrowLeft" /></button>
-        <span className={styles.avatar}>{other.avatar || other.nickname.slice(0, 1)}</span>
+        <span className={styles.avatar}><Avatar value={other.avatar} fallback={other.nickname.slice(0, 1)} /></span>
         <div><strong>{other.nickname}</strong><small>{unlocked ? '可以发送消息' : '等待双方回复内置消息'}</small></div>
         <button type="button" onClick={() => setMenuOpen(!menuOpen)} aria-label="会话设置"><Icon name="more" /></button>
       </header>
@@ -159,7 +160,7 @@ export default function ChatPage() {
           const mine = message.sender_id === account?.id
           return (
             <div key={message.id} className={mine ? `${styles.messageRow} ${styles.mine}` : styles.messageRow}>
-              {!mine && <span className={styles.avatar}>{other.avatar || other.nickname.slice(0, 1)}</span>}
+              {!mine && <span className={styles.avatar}><Avatar value={other.avatar} fallback={other.nickname.slice(0, 1)} /></span>}
               <div>
                 {message.system && <small>系统内置消息</small>}
                 <p>{message.text}</p>

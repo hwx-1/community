@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import Icon from '../components/Icon'
 import PostCard from '../components/PostCard'
+import { Avatar } from '../components/Avatar'
 import { api, CommentItem, formatTime } from '../api/client'
 import { useAuth } from '../store/auth'
 import styles from './PostDetailPage.module.css'
@@ -86,7 +87,7 @@ export default function PostDetailPage() {
       <PostCard post={data.post} variant="detail" />
 
       <section className={styles.commentComposer}>
-        <div className={styles.avatar}>{account?.avatar || account?.nickname.slice(0, 1)}</div>
+        <div className={styles.avatar}><Avatar value={account?.avatar} fallback={account?.nickname.slice(0, 1)} /></div>
         <form onSubmit={submitComment}>
           <label htmlFor="comment-content">{replyTo ? '发表回复' : '发表评论'}</label>
           {replyTo && (
@@ -110,7 +111,7 @@ export default function PostDetailPage() {
           const replies = repliesOf(comment)
           return (
             <article key={comment.id} className={styles.comment}>
-              <div className={styles.avatar}>{comment.author.avatar || comment.author.nickname.slice(0, 1)}</div>
+              <div className={styles.avatar}><Avatar value={comment.author.avatar} fallback={comment.author.nickname.slice(0, 1)} /></div>
               <div className={styles.commentBody}>
                 <div className={styles.commentMeta}>
                   {comment.deleted ? <strong>{comment.author.nickname}</strong> : <Link to={`/users/${comment.author.id}`}>{comment.author.nickname}</Link>}
@@ -133,7 +134,7 @@ export default function PostDetailPage() {
                       const replyToName = parent && parent.id !== comment.id ? parent.author.nickname : ''
                       return (
                         <div key={reply.id} className={styles.reply}>
-                          <div className={`${styles.avatar} ${styles.avatarSm}`}>{reply.author.avatar || reply.author.nickname.slice(0, 1)}</div>
+                          <div className={`${styles.avatar} ${styles.avatarSm}`}><Avatar value={reply.author.avatar} fallback={reply.author.nickname.slice(0, 1)} /></div>
                           <div className={styles.replyBody}>
                             <div className={styles.commentMeta}>
                               {reply.deleted ? <strong>{reply.author.nickname}</strong> : <Link to={`/users/${reply.author.id}`}>{reply.author.nickname}</Link>}

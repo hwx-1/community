@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import Icon from '../components/Icon'
 import PostCard from '../components/PostCard'
+import { Avatar } from '../components/Avatar'
 import { api, ApiError } from '../api/client'
 import { useAuth } from '../store/auth'
 import styles from './AccountPage.module.css'
@@ -73,7 +74,7 @@ export default function PublicProfilePage() {
       {user && (
         <>
           <section className={styles.publicProfile}>
-            <div className={styles.publicAvatar}>{user.avatar || user.nickname.slice(0, 1)}</div>
+            <div className={styles.publicAvatar}><Avatar value={user.avatar} fallback={user.nickname.slice(0, 1)} /></div>
             <div>
               <div>
                 <h1>{user.nickname}</h1>

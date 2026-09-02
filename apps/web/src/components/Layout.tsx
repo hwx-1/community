@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import Icon, { IconName } from './Icon'
+import { Avatar } from './Avatar'
 import { api, formatTime } from '../api/client'
 import { useAuth } from '../store/auth'
 import styles from './Layout.module.css'
@@ -124,7 +125,7 @@ export default function Layout() {
               <Icon name="bell" />
               {unreadTotal > 0 && <span className={styles.badgeDot}>{unreadTotal > 99 ? '99+' : unreadTotal}</span>}
             </NavLink>
-            <NavLink to="/me" className={styles.avatarSm} aria-label="我的主页">{account.avatar || account.nickname.slice(0, 1)}</NavLink>
+            <NavLink to="/me" className={styles.avatarSm} aria-label="我的主页"><Avatar value={account.avatar} fallback={account.nickname.slice(0, 1)} /></NavLink>
           </div>
         </div>
       </header>
@@ -222,7 +223,7 @@ function ProfileCard() {
   if (!account) return null
   return (
     <NavLink to="/me" className={styles.usercard}>
-      <div className={styles.avatarLg}>{account.avatar || account.nickname.slice(0, 1)}</div>
+      <div className={styles.avatarLg}><Avatar value={account.avatar} fallback={account.nickname.slice(0, 1)} /></div>
       <div className={styles.userInfo}>
         <div className={styles.name}>{account.nickname}</div>
         {account.verified && <span className={styles.badge}><Icon name="check" /> 沈大学生</span>}

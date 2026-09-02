@@ -1,6 +1,7 @@
 import { FormEvent, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Icon from '../components/Icon'
+import { Avatar } from '../components/Avatar'
 import { api, ApiError } from '../api/client'
 import { useAuth } from '../store/auth'
 import styles from './AccountPage.module.css'
@@ -58,7 +59,7 @@ export default function EditProfilePage() {
       <section className={styles.formCard}>
         <h2>公开资料</h2>
         <div className={styles.avatarEditor}>
-          <span>{avatar?.startsWith('/uploads/') ? <img src={avatar} alt="头像" /> : avatar || nickname.slice(0, 1)}</span>
+          <span><Avatar value={avatar} fallback={nickname.slice(0, 1)} /></span>
           <div><strong>头像</strong><small>JPG / PNG / WEBP / HEIC，最大 5MB</small><button type="button" onClick={() => fileRef.current?.click()}>更换头像</button></div>
           <input className="srOnly" ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic" onChange={(event) => uploadAvatar(event.target.files?.[0])} />
         </div>

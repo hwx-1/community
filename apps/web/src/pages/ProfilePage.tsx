@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import Icon, { IconName } from '../components/Icon'
 import PostCard from '../components/PostCard'
+import { Avatar } from '../components/Avatar'
 import { api, formatTime } from '../api/client'
 import { useAuth } from '../store/auth'
 import styles from './ProfilePage.module.css'
@@ -29,7 +30,7 @@ export default function ProfilePage() {
     <>
       <section className={styles.profileCard}>
         <div className={styles.profileTop}>
-          <div className={styles.avatar}>{account?.avatar || account?.nickname.slice(0, 1)}</div>
+          <div className={styles.avatar}><Avatar value={account?.avatar} fallback={account?.nickname.slice(0, 1)} /></div>
           <div className={styles.profileMain}>
             <div className={styles.nameLine}><h1>{account?.nickname}</h1>{account?.verified && <span><Icon name="check" />沈大学生</span>}</div>
             <p>{account?.gender || '未设置'} · {account?.class_name || '未设置班级'}</p>

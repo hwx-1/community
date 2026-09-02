@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import Icon, { IconName } from '../components/Icon'
+import { Avatar } from '../components/Avatar'
 import { api, AppNotification, formatTime } from '../api/client'
 import { useAuth } from '../store/auth'
 import styles from './MessagesPage.module.css'
@@ -82,7 +83,7 @@ export default function MessagesPage() {
           const convUnread = item.unread_count > 0
           return (
             <button key={item.id} className={styles.item} type="button" onClick={() => openConversation(item.id)}>
-              <span className={styles.avatar}>{item.other.avatar || item.other.nickname.slice(0, 1)}</span>
+              <span className={styles.avatar}><Avatar value={item.other.avatar} fallback={item.other.nickname.slice(0, 1)} /></span>
               <span className={styles.itemBody}>
                 <strong className={convUnread ? styles.unreadTitle : ''}>{item.other.nickname}</strong>
                 <span className={item.unlocked ? '' : styles.locked}>

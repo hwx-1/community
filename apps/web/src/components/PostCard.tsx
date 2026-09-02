@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Icon from './Icon'
+import { Avatar } from './Avatar'
+import { isImageUrl } from '../utils/image'
 import { api, formatTime, Post } from '../api/client'
 import { useAuth } from '../store/auth'
 import styles from './PostCard.module.css'
@@ -76,7 +78,7 @@ export default function PostCard({ post, onChanged, variant = 'feed' }: { post: 
     <div className={styles.previewOverlay} role="dialog" aria-modal="true" aria-label="图片预览" onClick={() => setPreview(null)}>
       <button type="button" aria-label="关闭图片预览" onClick={() => setPreview(null)}><Icon name="close" /></button>
       <div onClick={(event) => event.stopPropagation()}>
-        {preview.startsWith('/uploads/') ? <img src={preview} alt="帖子图片预览" /> : <><Icon name="image" /><strong>{preview}</strong><span>演示图片占位</span></>}
+        {isImageUrl(preview) ? <img src={preview} alt="帖子图片预览" /> : <><Icon name="image" /><strong>{preview}</strong><span>演示图片占位</span></>}
       </div>
     </div>
   )
@@ -92,7 +94,7 @@ export default function PostCard({ post, onChanged, variant = 'feed' }: { post: 
       <article className={post.pinned ? `${styles.detail} ${styles.pinned}` : styles.detail}>
         <header className={styles.head}>
           <button className={styles.authorButton} type="button" aria-label={`查看 ${post.author.nickname} 的主页`} onClick={() => navigate(`/users/${post.author.id}`)}>
-            <span className={styles.avatar}>{post.author.avatar || post.author.nickname.slice(0, 1)}</span>
+            <span className={styles.avatar}><Avatar value={post.author.avatar} fallback={post.author.nickname.slice(0, 1)} /></span>
             <span className={styles.authorMeta}>
               <span className={styles.name}>
                 {post.author.nickname}
@@ -114,7 +116,7 @@ export default function PostCard({ post, onChanged, variant = 'feed' }: { post: 
           <div className={`${styles.imgs} ${styles[`g${Math.min(images.length, 5)}`]}`}>
             {images.map((img, index) => (
               <button key={img} className={styles.img} type="button" aria-label={`查看图片 ${index + 1}`} onClick={() => setPreview(img)}>
-                {img.startsWith('/uploads/') ? imgOrFallback(img, `帖子图片 ${index + 1}`) : <><Icon name="image" /><span>{img}</span></>}
+                {isImageUrl(img) ? imgOrFallback(img, `帖子图片 ${index + 1}`) : <><Icon name="image" /><span>{img}</span></>}
               </button>
             ))}
           </div>
@@ -143,7 +145,7 @@ export default function PostCard({ post, onChanged, variant = 'feed' }: { post: 
     <article className={post.pinned ? `${styles.stream} ${styles.pinned}` : styles.stream}>
       <header className={styles.head}>
         <button className={styles.authorButton} type="button" aria-label={`查看 ${post.author.nickname} 的主页`} onClick={() => navigate(`/users/${post.author.id}`)}>
-          <span className={styles.avatar}>{post.author.avatar || post.author.nickname.slice(0, 1)}</span>
+          <span className={styles.avatar}><Avatar value={post.author.avatar} fallback={post.author.nickname.slice(0, 1)} /></span>
           <span className={styles.authorMeta}>
             <span className={styles.name}>
               {post.author.nickname}
@@ -165,7 +167,7 @@ export default function PostCard({ post, onChanged, variant = 'feed' }: { post: 
         <div className={`${styles.streamImgs} ${styles[`g${Math.min(images.length, 5)}`]}`}>
           {images.map((img, index) => (
             <button key={img} className={styles.img} type="button" aria-label={`查看图片 ${index + 1}`} onClick={() => setPreview(img)}>
-              {img.startsWith('/uploads/') ? imgOrFallback(img, `帖子图片 ${index + 1}`) : <><Icon name="image" /><span>{img}</span></>}
+              {isImageUrl(img) ? imgOrFallback(img, `帖子图片 ${index + 1}`) : <><Icon name="image" /><span>{img}</span></>}
             </button>
           ))}
         </div>
