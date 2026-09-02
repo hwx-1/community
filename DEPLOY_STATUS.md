@@ -100,7 +100,7 @@ df -h && free -h
 | 服务 | 地址 | 说明 |
 |-----|------|------|
 | 社区首页 | https://xsnbb.xyz | 注册/手机号登录 |
-| 管理后台 | https://xsnbb.xyz/admin/ | admin，密码以服务器 `infra/.env` 首次初始化为准 |
+| 管理后台 | https://xsnbb.xyz/admin/ | admin，密码已于 2026-09-02 通过独立安全流程重置（API/界面均不支持超管改密：生成 argon2id 哈希 → 停服 → 替换 db_store_snapshots 快照中 admin_password_hashes.admin → 重启）。`.env` 的 SUPER_ADMIN_PASSWORD 仅在无任何超管的全新初始化时生效 |
 | Portainer | http://39.106.198.88:9000 | Docker 可视化管理 |
 
 ## 七、凭据与密钥位置
