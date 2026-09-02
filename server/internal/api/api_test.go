@@ -461,7 +461,14 @@ func TestAIFeedbackFlow(t *testing.T) {
 	if retry["needs_feedback"] == true {
 		t.Fatal("重答的答案不应再要求确认")
 	}
+	if int64(retry["retry_of"].(float64)) != answerID2 {
+		t.Fatalf("重答应标记 retry_of 指向原知识库答案，got %v", retry["retry_of"])
+	}
 	status, body = c.do(http.MethodGet, "/api/v1/ai/conversations", nil)
+	// 重答不占额度：当天共 2 条知识库回答计入额度，重答跳过 → 剩余 8
+	if remaining := body["remaining"].(float64); remaining != 8 {
+		t.Fatalf("重答不应占用当日额度，期望 remaining=8，got %v", remaining)
+	}
 	for _, item := range body["items"].([]any) {
 		conv := item.(map[string]any)
 		if int64(conv["id"].(float64)) != convID2 {

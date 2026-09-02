@@ -142,7 +142,10 @@ type AIMessage struct {
 	// 「这个答案是你想要的吗？」；确认后清零并记录 Feedback（"yes"/"no"）。
 	NeedsFeedback bool      `json:"needs_feedback,omitempty"`
 	Feedback      string    `json:"feedback,omitempty"`
-	CreatedAt     time.Time `json:"created_at"`
+	// RetryOf 非零表示这是对消息 RetryOf 的「不满意重答」：
+	// 知识库答错后的补救不应再扣当日额度，额度统计会跳过此类消息。
+	RetryOf   int64     `json:"retry_of,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
 }
 type DirectConversation struct {
 	ID         int64           `json:"id"`

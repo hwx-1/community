@@ -1204,12 +1204,13 @@ func (a *API) aiFeedback(c *gin.Context) {
 			fail(c, 404, "CONVERSATION_NOT_FOUND", "会话不存在")
 			return
 		}
-		answer := app.AIMessage{ID: a.store.NextID(), Role: "assistant", Text: answerText, Model: model, Source: source, CreatedAt: time.Now()}
+		answer := app.AIMessage{ID: a.store.NextID(), Role: "assistant", Text: answerText, Model: model, Source: source, RetryOf: mid, CreatedAt: time.Now()}
 		conv.Messages = append(conv.Messages, answer)
 		if needRecord {
 			recordPendingQuestion(a.store, account.ID, question)
 		}
-		c.JSON(200, gin.H{"answer": answer, "remaining": remaining - 1})
+		// 知识库答错后的重答不占用当日额度，remaining 保持不变
+		c.JSON(200, gin.H{"answer": answer, "remaining": remaining})
 	})
 }
 
@@ -1776,7 +1777,7 @@ func countAnswersToday(items []app.Conversation) int {
 	count := 0
 	for _, conv := range items {
 		for _, m := range conv.Messages {
-			if m.Role == "assistant" && sameDay(m.CreatedAt, time.Now()) {
+			if m.Role == "assistant" && m.RetryOf == 0 && sameDay(m.CreatedAt, time.Now()) {
 				count++
 			}
 		}
@@ -1790,7 +1791,7 @@ func countAnswersTodayUnlocked(items map[int64]*app.Conversation, owner int64) i
 			continue
 		}
 		for _, m := range conv.Messages {
-			if m.Role == "assistant" && sameDay(m.CreatedAt, time.Now()) {
+			if m.Role == "assistant" && m.RetryOf == 0 && sameDay(m.CreatedAt, time.Now()) {
 				count++
 			}
 		}
