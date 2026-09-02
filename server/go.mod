@@ -1,11 +1,12 @@
 module github.com/xsnbb/server
 
-go 1.24
+go 1.25.0
 
 require (
 	github.com/alibabacloud-go/darabonba-openapi/v2 v2.2.4
 	github.com/alibabacloud-go/dypnsapi-20170525/v2 v2.2.3
 	github.com/alibabacloud-go/tea v1.5.2
+	github.com/aliyun/aliyun-oss-go-sdk v3.0.2+incompatible
 	github.com/gin-gonic/gin v1.10.1
 	golang.org/x/crypto v0.41.0
 	gorm.io/driver/postgres v1.6.0
@@ -55,6 +56,7 @@ require (
 	golang.org/x/sync v0.16.0 // indirect
 	golang.org/x/sys v0.35.0 // indirect
 	golang.org/x/text v0.28.0 // indirect
+	golang.org/x/time v0.15.0 // indirect
 	google.golang.org/protobuf v1.34.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

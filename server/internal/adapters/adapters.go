@@ -62,12 +62,7 @@ func (l localOSS) Put(_ context.Context, key string, data []byte, _ string) (str
 }
 func (localOSS) DevMode() bool { return true }
 
-type aliyunOSS struct{ bucket, endpoint string }
-
-func (a aliyunOSS) Put(_ context.Context, _ string, _ []byte, _ string) (string, error) {
-	return "", fmt.Errorf("OSS 供应商调用尚未接入（bucket %s 已配置），当前环境不能上传真实对象", a.bucket)
-}
-func (aliyunOSS) DevMode() bool { return false }
+// aliyunOSS 真实实现见 oss_aliyun.go（阿里云 OSS SDK）。
 
 // ---- 内容审核 ----
 
@@ -210,8 +205,16 @@ func New(cfg *config.Config) *Set {
 	} else {
 		set.SMS = devSMS{}
 	}
-	if cfg.OSSBucket != "" && cfg.OSSEndpoint != "" && cfg.OSSAccessKey != "" {
-		set.OSS = aliyunOSS{bucket: cfg.OSSBucket, endpoint: cfg.OSSEndpoint}
+	// OSS：四个参数齐全才启用真实供应商；只填一部分视为配置错误，拒绝静默降级
+	if cfg.OSSAccessKey != "" || cfg.OSSSecret != "" || cfg.OSSEndpoint != "" || cfg.OSSBucket != "" {
+		if cfg.OSSAccessKey == "" || cfg.OSSSecret == "" || cfg.OSSEndpoint == "" || cfg.OSSBucket == "" {
+			log.Fatal("[adapters] OSS 配置不完整：OSS_ACCESS_KEY / OSS_SECRET / OSS_ENDPOINT / OSS_BUCKET 必须同时填写或同时留空")
+		}
+		ossImpl, err := newAliyunOSS(cfg.OSSAccessKey, cfg.OSSSecret, cfg.OSSEndpoint, cfg.OSSBucket)
+		if err != nil {
+			log.Fatalf("[adapters] %v", err)
+		}
+		set.OSS = ossImpl
 	} else {
 		set.OSS = localOSS{dir: cfg.UploadDir}
 	}
