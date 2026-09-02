@@ -5,6 +5,8 @@
 # ---- 阶段 1：构建两个前端 ----
 FROM docker.m.daocloud.io/library/node:22-alpine AS frontend
 WORKDIR /repo
+ENV COREPACK_NPM_REGISTRY=https://registry.npmmirror.com
+RUN npm config set registry https://registry.npmmirror.com
 RUN corepack enable
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY apps/web/package.json apps/web/
