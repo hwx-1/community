@@ -112,6 +112,7 @@ df -h && free -h
 | Codeup 仓库部署密钥 | 服务器 `/root/.ssh/codeup_readonly_ed25519` | 备用：服务器从 Codeup 拉代码（当前部署不使用） |
 | 生产环境变量 | 服务器 `/opt/xsnbb/infra/.env`（权限 600） | 数据库密码、超管初始化、SMS_* 等 |
 | 短信 AccessKey | 服务器 `/opt/xsnbb/infra/.env` 的 `SMS_ACCESS_KEY` / `SMS_SECRET` | 号码认证服务（RAM 子用户，AliyunDypnsFullAccess） |
+| OSS AccessKey | 服务器 `/opt/xsnbb/infra/.env` 的 `OSS_ACCESS_KEY` / `OSS_SECRET` | OSS 图片上传（RAM 子用户，仅 xsnbb-img Bucket 最小权限） |
 
 ## 八、已完成的外部服务接入
 
@@ -129,12 +130,19 @@ df -h && free -h
 - 修复：服务器 `/etc/nginx/sites-available/xsnbb` 已同步为仓库版本（6m 限制、安全响应头、静态缓存、WebSocket 预留）
 - 注意：**nginx 配置不在流水线覆盖范围**（位于 /etc/nginx），修改 `infra/nginx/xsnbb.conf` 后需手动 scp 到服务器并 `nginx -t && systemctl reload nginx`
 
+### 阿里云 OSS 图片存储 ✅ 2026-09-02
+
+- Bucket：`xsnbb-img`（华北 2 北京，标准存储，公共读），Endpoint `oss-cn-beijing.aliyuncs.com`
+- 凭据：RAM 子用户（自定义最小权限策略，仅该 Bucket 的 Put/Get/Delete），存于 `infra/.env` 的 `OSS_*` 四项
+- 验收：`/api/v1/capabilities` 返回 `"oss":{"dev_mode":false}`，新上传图片 URL 为 `https://xsnbb-img.oss-cn-beijing.aliyuncs.com/...`
+- 兼容：切换前上传的本地图片继续由 `/uploads/` 路径访问，无需迁移
+- 后续可选：接入 CDN 自定义域名（如 img.xsnbb.xyz），代码已预留，改 `publicBase` 一处即可
+
 ## 九、未完成事项
 
 ### 中优先级（影响真实用户使用）
 - [ ] **阿里云内容安全接入**（现为内置演示违禁词 BANNED_WORDS，涉及 server/internal/adapters/adapters.go）
-- [ ] **阿里云 OSS 接入**（现图片存本地 uploads/；需 Bucket + AccessKey + CDN 域名）
-- [ ] **短信 AccessKey 轮换**（2026-09-02 首对 Key 的 Secret 曾在聊天中明文出现，建议 RAM 控制台禁用旧 Key 后生成新 Key 更新 .env）
+- [ ] **AccessKey 轮换**（2026-09-02 短信与 OSS 两对 Key 的 Secret 曾在聊天中明文出现，建议 RAM 控制台禁用旧 Key 后生成新 Key 更新 .env）
 
 ### 低优先级（内测阶段可延后）
 - [ ] **AI 问答真实 API 接入**（需 OpenAI 兼容 API 的 BaseURL + Key，如 DashScope）
