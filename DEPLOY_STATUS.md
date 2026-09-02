@@ -110,14 +110,31 @@ df -h && free -h
 | 云效访问令牌 | macOS 钥匙串（git 自动读取） | 本地 push 到 Codeup |
 | `~/.ssh/xsnbb_deploy_ed25519` | 本机 + 服务器 authorized_keys | SSH 登录服务器运维 |
 | Codeup 仓库部署密钥 | 服务器 `/root/.ssh/codeup_readonly_ed25519` | 备用：服务器从 Codeup 拉代码（当前部署不使用） |
-| 生产环境变量 | 服务器 `/opt/xsnbb/infra/.env`（权限 600） | 数据库密码、超管初始化等 |
+| 生产环境变量 | 服务器 `/opt/xsnbb/infra/.env`（权限 600） | 数据库密码、超管初始化、SMS_* 等 |
+| 短信 AccessKey | 服务器 `/opt/xsnbb/infra/.env` 的 `SMS_ACCESS_KEY` / `SMS_SECRET` | 号码认证服务（RAM 子用户，AliyunDypnsFullAccess） |
 
-## 八、未完成事项
+## 八、已完成的外部服务接入
+
+### 短信验证码（号码认证服务 dypnsapi）✅ 2026-09-02
+
+- 产品：**号码认证服务**（不是短信服务 dysmsapi），按发送量计费
+- 模式：验证码由本服务生成/存储/校验（有效期 5 分钟、3 次试错、一次性），阿里云仅负责下发（SendSmsVerifyCode）
+- 签名：赠送签名 `恒创联众`（该产品不支持自定义签名）；模板：赠送模板 `100001`（变量 `${code}` / `${min}`）
+- 凭据：RAM 子用户 AccessKey（策略 AliyunDypnsFullAccess），存于服务器 `infra/.env` 的 `SMS_*` 四项
+- 验收：`/api/v1/capabilities` 返回 `"sms":{"dev_mode":false}`，真实手机号注册全流程通过
+
+### Nginx 上传限制修复 ✅ 2026-09-02
+
+- 问题：nginx 默认 `client_max_body_size 1m` 导致头像上传 413
+- 修复：服务器 `/etc/nginx/sites-available/xsnbb` 已同步为仓库版本（6m 限制、安全响应头、静态缓存、WebSocket 预留）
+- 注意：**nginx 配置不在流水线覆盖范围**（位于 /etc/nginx），修改 `infra/nginx/xsnbb.conf` 后需手动 scp 到服务器并 `nginx -t && systemctl reload nginx`
+
+## 九、未完成事项
 
 ### 中优先级（影响真实用户使用）
 - [ ] **阿里云内容安全接入**（现为内置演示违禁词 BANNED_WORDS，涉及 server/internal/adapters/adapters.go）
-- [ ] **阿里云短信接入**（现为开发模式，验证码在 API 响应中返回 dev_code；需签名/模板审批 + AccessKey）
 - [ ] **阿里云 OSS 接入**（现图片存本地 uploads/；需 Bucket + AccessKey + CDN 域名）
+- [ ] **短信 AccessKey 轮换**（2026-09-02 首对 Key 的 Secret 曾在聊天中明文出现，建议 RAM 控制台禁用旧 Key 后生成新 Key 更新 .env）
 
 ### 低优先级（内测阶段可延后）
 - [ ] **AI 问答真实 API 接入**（需 OpenAI 兼容 API 的 BaseURL + Key，如 DashScope）
