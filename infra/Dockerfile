@@ -14,7 +14,7 @@ COPY apps ./apps
 RUN pnpm -r build
 
 # ---- 阶段 2：构建 Go 后端 ----
-FROM golang:1.24-alpine AS backend
+FROM golang:1.25-alpine AS backend
 WORKDIR /repo
 ARG GOPROXY=https://goproxy.cn,direct
 ENV GOPROXY=${GOPROXY}
