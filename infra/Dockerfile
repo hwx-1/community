@@ -3,7 +3,7 @@
 # 运行:docker run -p 8080:8080 -v xsnbb-data:/data xsnbb
 
 # ---- 阶段 1：构建两个前端 ----
-FROM node:22-alpine AS frontend
+FROM docker.m.daocloud.io/library/node:22-alpine AS frontend
 WORKDIR /repo
 RUN corepack enable
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
@@ -14,7 +14,7 @@ COPY apps ./apps
 RUN pnpm -r build
 
 # ---- 阶段 2：构建 Go 后端 ----
-FROM golang:1.25-alpine AS backend
+FROM docker.m.daocloud.io/library/golang:1.25-alpine AS backend
 WORKDIR /repo
 ARG GOPROXY=https://goproxy.cn,direct
 ENV GOPROXY=${GOPROXY}
@@ -25,7 +25,7 @@ COPY server ./server
 RUN cd server && CGO_ENABLED=0 go build -trimpath -o /xsnbb-api ./cmd/api
 
 # ---- 阶段 3：运行镜像 ----
-FROM alpine:3.20
+FROM docker.m.daocloud.io/library/alpine:3.20
 # tzdata 必需：Go 的 time.LoadLocation("Asia/Shanghai") 依赖系统时区数据，
 # alpine 默认不带，缺失会导致 AI 问答额度统计 panic（接口 500）
 RUN apk add --no-cache tzdata
