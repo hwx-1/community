@@ -210,7 +210,7 @@ func New(cfg *config.Config) *Set {
 		if cfg.OSSAccessKey == "" || cfg.OSSSecret == "" || cfg.OSSEndpoint == "" || cfg.OSSBucket == "" {
 			log.Fatal("[adapters] OSS 配置不完整：OSS_ACCESS_KEY / OSS_SECRET / OSS_ENDPOINT / OSS_BUCKET 必须同时填写或同时留空")
 		}
-		ossImpl, err := newAliyunOSS(cfg.OSSAccessKey, cfg.OSSSecret, cfg.OSSEndpoint, cfg.OSSBucket)
+		ossImpl, err := newAliyunOSS(cfg.OSSAccessKey, cfg.OSSSecret, cfg.OSSEndpoint, cfg.OSSBucket, cfg.OSSPublicBase)
 		if err != nil {
 			log.Fatalf("[adapters] %v", err)
 		}

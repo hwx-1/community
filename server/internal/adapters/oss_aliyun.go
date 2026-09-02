@@ -18,7 +18,7 @@ type aliyunOSS struct {
 	publicBase string // 例如 https://bucket-name.oss-cn-beijing.aliyuncs.com
 }
 
-func newAliyunOSS(accessKeyID, accessKeySecret, endpoint, bucketName string) (*aliyunOSS, error) {
+func newAliyunOSS(accessKeyID, accessKeySecret, endpoint, bucketName, publicBase string) (*aliyunOSS, error) {
 	host := strings.TrimPrefix(strings.TrimPrefix(endpoint, "https://"), "http://")
 	client, err := oss.New("https://"+host, accessKeyID, accessKeySecret)
 	if err != nil {
@@ -28,9 +28,13 @@ func newAliyunOSS(accessKeyID, accessKeySecret, endpoint, bucketName string) (*a
 	if err != nil {
 		return nil, fmt.Errorf("获取 OSS Bucket 失败: %w", err)
 	}
+	base := strings.TrimRight(publicBase, "/")
+	if base == "" {
+		base = "https://" + bucketName + "." + host
+	}
 	return &aliyunOSS{
 		bucket:     bucket,
-		publicBase: "https://" + bucketName + "." + host,
+		publicBase: base,
 	}, nil
 }
 

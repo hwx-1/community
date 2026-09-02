@@ -34,6 +34,7 @@ type Config struct {
 	OSSSecret     string
 	OSSEndpoint   string
 	OSSBucket     string
+	OSSPublicBase string // 可选：图片对外访问的基础 URL（如 CDN 域名 https://img.xsnbb.xyz），留空则用 Bucket 标准域名
 	UploadDir     string // 开发模式本地存储目录
 	WebDist       string // 社区 Web 构建产物目录（存在则由本服务托管）
 	AdminDist     string // 管理后台构建产物目录（挂载在 /admin/）
@@ -65,6 +66,7 @@ func Load() *Config {
 		OSSSecret:          getenv("OSS_SECRET", ""),
 		OSSEndpoint:        getenv("OSS_ENDPOINT", ""),
 		OSSBucket:          getenv("OSS_BUCKET", ""),
+		OSSPublicBase:      getenv("OSS_PUBLIC_BASE", ""),
 		UploadDir:          getenv("UPLOAD_DIR", "uploads"),
 		WebDist:            getenv("WEB_DIST", "../apps/web/dist"),
 		AdminDist:          getenv("ADMIN_DIST", "../apps/admin/dist"),

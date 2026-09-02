@@ -33,6 +33,7 @@ services:
       - OSS_SECRET=${OSS_SECRET:-}
       - OSS_ENDPOINT=${OSS_ENDPOINT:-}
       - OSS_BUCKET=${OSS_BUCKET:-}
+      - OSS_PUBLIC_BASE=${OSS_PUBLIC_BASE:-}
       - SEARCH_BASE_URL=${SEARCH_BASE_URL:-}
       - SEARCH_API_KEY=${SEARCH_API_KEY:-}
       - BANNED_WORDS=${BANNED_WORDS:-代考,枪手,赌博,诈骗}
