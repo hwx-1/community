@@ -36,13 +36,7 @@ func (devSMS) Send(_ context.Context, phone, code string) error {
 }
 func (devSMS) DevMode() bool { return true }
 
-// aliyunSMS 预留阿里云短信实现；首版未接入 SDK，配置了凭证也明确返回未实现错误。
-type aliyunSMS struct{ sign, template string }
-
-func (a aliyunSMS) Send(_ context.Context, phone, _ string) error {
-	return fmt.Errorf("短信供应商调用尚未接入（签名 %s / 模板 %s 已配置），当前环境不能发送真实短信", a.sign, a.template)
-}
-func (a aliyunSMS) DevMode() bool { return false }
+// aliyunSMS 真实实现见 sms_aliyun.go（阿里云 dysmsapi SDK）。
 
 // ---- 对象存储 ----
 
@@ -203,8 +197,16 @@ func New(cfg *config.Config) *Set {
 		Moderation: keywordModeration{words: cfg.BannedWords},
 		AI:         newOpenAICompatAI(),
 	}
-	if cfg.SMSSignName != "" && cfg.SMSTemplate != "" && cfg.SMSAccessKey != "" {
-		set.SMS = aliyunSMS{sign: cfg.SMSSignName, template: cfg.SMSTemplate}
+	// 短信：四个参数齐全才启用真实供应商；只填一部分视为配置错误，拒绝静默降级
+	if cfg.SMSAccessKey != "" || cfg.SMSSecret != "" || cfg.SMSSignName != "" || cfg.SMSTemplate != "" {
+		if cfg.SMSAccessKey == "" || cfg.SMSSecret == "" || cfg.SMSSignName == "" || cfg.SMSTemplate == "" {
+			log.Fatal("[adapters] 短信配置不完整：SMS_ACCESS_KEY / SMS_SECRET / SMS_SIGN_NAME / SMS_TEMPLATE 必须同时填写或同时留空")
+		}
+		sms, err := newAliyunSMS(cfg.SMSAccessKey, cfg.SMSSecret, cfg.SMSSignName, cfg.SMSTemplate)
+		if err != nil {
+			log.Fatalf("[adapters] %v", err)
+		}
+		set.SMS = sms
 	} else {
 		set.SMS = devSMS{}
 	}
