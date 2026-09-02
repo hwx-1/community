@@ -294,6 +294,11 @@ func (a *API) adminKBUpdate(c *gin.Context) {
 			entry.Title = in.Title
 		}
 		if in.Content != "" {
+			if in.Content != entry.Content {
+				// 答案内容修订后历史差评失效，重新积累
+				entry.Dislikes = 0
+				entry.LastDislikeAt = nil
+			}
 			entry.Content = in.Content
 		}
 		if in.Category != "" {
@@ -328,13 +333,21 @@ func (a *API) adminKBDelete(c *gin.Context) {
 
 func (a *API) adminPendingQuestions(c *gin.Context) {
 	items := []app.PendingQuestion{}
+	disliked := []app.KBEntry{}
 	a.store.MuRLock(func() {
 		for _, q := range a.store.PendingQuestions {
 			items = append(items, *q)
 		}
+		// 被用户在答案确认中点过「否」的知识库条目，提示管理员复查质量
+		for _, e := range a.store.KBEntries {
+			if e.Dislikes > 0 {
+				disliked = append(disliked, *e)
+			}
+		}
 	})
 	sort.Slice(items, func(i, j int) bool { return items[i].CreatedAt.After(items[j].CreatedAt) })
-	c.JSON(http.StatusOK, gin.H{"items": items})
+	sort.Slice(disliked, func(i, j int) bool { return disliked[i].Dislikes > disliked[j].Dislikes })
+	c.JSON(http.StatusOK, gin.H{"items": items, "kb_disliked": disliked})
 }
 
 func (a *API) adminAnswerQuestion(c *gin.Context) {

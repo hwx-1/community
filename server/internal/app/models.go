@@ -144,7 +144,10 @@ type AIMessage struct {
 	Feedback      string    `json:"feedback,omitempty"`
 	// RetryOf 非零表示这是对消息 RetryOf 的「不满意重答」：
 	// 知识库答错后的补救不应再扣当日额度，额度统计会跳过此类消息。
-	RetryOf   int64     `json:"retry_of,omitempty"`
+	RetryOf int64 `json:"retry_of,omitempty"`
+	// KBEntryID 非零表示该答案直接引用了对应知识库条目，
+	// 用户点「否」时据此给条目累计差评。
+	KBEntryID int64     `json:"kb_entry_id,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 }
 type DirectConversation struct {
@@ -195,7 +198,11 @@ type KBEntry struct {
 	Source     string    `json:"source"`      // 来源说明，如「学校官网-校长办公室」
 	SourceDate string    `json:"source_date"` // 来源发布日期
 	Enabled    bool      `json:"enabled"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	// Dislikes 用户在答案确认中点「否」的次数，用于后台发现质量不佳的条目；
+	// LastDislikeAt 最近一次被点「否」的时间。
+	Dislikes      int        `json:"dislikes"`
+	LastDislikeAt *time.Time `json:"last_dislike_at,omitempty"`
+	UpdatedAt     time.Time  `json:"updated_at"`
 }
 
 // PendingQuestion AI 未能回答、等待管理员补充的问题。

@@ -482,5 +482,33 @@ func TestAIFeedbackFlow(t *testing.T) {
 		if kbMsg["needs_feedback"] == true || kbMsg["feedback"] != "no" {
 			t.Fatalf("原知识库答案应标记 feedback=no：%v", kbMsg)
 		}
+		if kbMsg["kb_entry_id"] == nil {
+			t.Fatal("知识库答案应记录 kb_entry_id 以便累计差评")
+		}
+	}
+
+	// 5) 被点「否」的知识库条目应出现在管理端待补充问题接口的 kb_disliked 中
+	admin := newClient(t, srv.URL)
+	admin.do(http.MethodPost, "/api/v1/admin/auth/login", map[string]string{"username": "admin", "password": "Admin12345"})
+	status, body = admin.do(http.MethodGet, "/api/v1/admin/pending-questions", nil)
+	if status != http.StatusOK {
+		t.Fatalf("pending questions failed: %d", status)
+	}
+	disliked, _ := body["kb_disliked"].([]any)
+	found := false
+	for _, item := range disliked {
+		entry := item.(map[string]any)
+		if entry["title"] == "教务处联系电话" {
+			found = true
+			if entry["dislikes"].(float64) != 1 {
+				t.Fatalf("差评计数应为 1，got %v", entry["dislikes"])
+			}
+			if entry["last_dislike_at"] == nil {
+				t.Fatal("应记录最近差评时间")
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("被点「否」的知识库条目应出现在 kb_disliked，got %v", disliked)
 	}
 }

@@ -1054,7 +1054,7 @@ func (a *API) askAI(c *gin.Context) {
 				continue
 			}
 			if kbMatch(e, question) {
-				answer := app.AIMessage{ID: a.store.NextID(), Role: "assistant", Text: e.Content, Model: model, Source: fmt.Sprintf("校内资料 · %s（%s）", e.Source, e.SourceDate), NeedsFeedback: true, CreatedAt: now}
+				answer := app.AIMessage{ID: a.store.NextID(), Role: "assistant", Text: e.Content, Model: model, Source: fmt.Sprintf("校内资料 · %s（%s）", e.Source, e.SourceDate), NeedsFeedback: true, KBEntryID: e.ID, CreatedAt: now}
 				conv.Messages = append(conv.Messages, user, answer)
 				conv.Model = model
 				if conv.Title == "新会话" {
@@ -1187,6 +1187,14 @@ func (a *API) aiFeedback(c *gin.Context) {
 		}
 		conv.Messages[idx].NeedsFeedback = false
 		conv.Messages[idx].Feedback = "no"
+		// 给被否定的知识库条目累计差评，供后台发现质量不佳的答案
+		if kbID := conv.Messages[idx].KBEntryID; kbID != 0 {
+			if entry, exists := a.store.KBEntries[kbID]; exists {
+				entry.Dislikes++
+				now := time.Now()
+				entry.LastDislikeAt = &now
+			}
+		}
 		history = append(history, conv.Messages...)
 		providers = enabledProviders(a.store.Providers, model)
 	})

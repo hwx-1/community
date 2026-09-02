@@ -188,6 +188,8 @@ export interface KBEntry {
   source: string
   source_date: string
   enabled: boolean
+  dislikes: number
+  last_dislike_at?: string
   updated_at: string
 }
 

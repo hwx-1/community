@@ -9,9 +9,10 @@ import {
   message,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
+import { Link } from 'react-router-dom'
 import dayjs from 'dayjs'
 import { api } from '../api'
-import type { PendingQuestion } from '../types'
+import type { KBEntry, PendingQuestion } from '../types'
 
 const statusText: Record<PendingQuestion['status'], string> = {
   open: '待补充',
@@ -27,6 +28,7 @@ const statusColor: Record<PendingQuestion['status'], string> = {
 
 export default function PendingQuestions() {
   const [items, setItems] = useState<PendingQuestion[]>([])
+  const [kbDisliked, setKbDisliked] = useState<KBEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [target, setTarget] = useState<PendingQuestion | null>(null)
   const [answer, setAnswer] = useState('')
@@ -36,7 +38,10 @@ export default function PendingQuestions() {
     setLoading(true)
     api
       .pendingQuestions()
-      .then((res) => setItems(res.items))
+      .then((res) => {
+        setItems(res.items)
+        setKbDisliked(res.kb_disliked ?? [])
+      })
       .catch((err) => message.error(err.message ?? '加载失败'))
       .finally(() => setLoading(false))
   }, [])
@@ -130,6 +135,33 @@ export default function PendingQuestions() {
     },
   ]
 
+  const kbColumns: ColumnsType<KBEntry> = [
+    { title: '条目标题', dataIndex: 'title', width: 180 },
+    { title: '当前答案', dataIndex: 'content', ellipsis: true },
+    {
+      title: '被点「否」',
+      dataIndex: 'dislikes',
+      width: 110,
+      render: (count: number) => <Tag color="red">{count} 次</Tag>,
+    },
+    {
+      title: '最近差评',
+      dataIndex: 'last_dislike_at',
+      width: 150,
+      render: (v?: string) => (v ? dayjs(v).format('YYYY-MM-DD HH:mm') : '—'),
+    },
+    {
+      title: '操作',
+      key: 'actions',
+      width: 130,
+      render: () => (
+        <Link to="/kb">
+          <Button size="small">去知识库修订</Button>
+        </Link>
+      ),
+    },
+  ]
+
   return (
     <div>
       <h2 className="page-title">待补充问题</h2>
@@ -139,6 +171,24 @@ export default function PendingQuestions() {
         style={{ marginBottom: 16 }}
         message="以下是 AI 暂时答不上来的问题。补充答案后系统会通知提问用户，并沉淀进知识库。"
       />
+      {kbDisliked.length > 0 && (
+        <>
+          <Alert
+            type="warning"
+            showIcon
+            style={{ marginBottom: 8 }}
+            message="以下知识库答案被用户点了「否」，可能已过时或不准确，请核实修订（修订后差评计数会清零重计）。"
+          />
+          <Table<KBEntry>
+            rowKey="id"
+            size="small"
+            dataSource={kbDisliked}
+            columns={kbColumns}
+            pagination={false}
+            style={{ marginBottom: 24 }}
+          />
+        </>
+      )}
       <Table<PendingQuestion>
         rowKey="id"
         loading={loading}

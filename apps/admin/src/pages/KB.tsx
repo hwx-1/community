@@ -119,6 +119,13 @@ export default function KB() {
     { title: '来源', dataIndex: 'source', width: 180 },
     { title: '来源日期', dataIndex: 'source_date', width: 110 },
     {
+      title: '用户评价',
+      dataIndex: 'dislikes',
+      width: 100,
+      render: (v: number) =>
+        v > 0 ? <Tag color="red">被否 {v} 次</Tag> : <Tag color="green">无差评</Tag>,
+    },
+    {
       title: '启用',
       dataIndex: 'enabled',
       width: 80,

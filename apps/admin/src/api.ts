@@ -227,7 +227,7 @@ export const api = {
 
   // 待补充问题
   pendingQuestions: () =>
-    request<{ items: PendingQuestion[] }>('GET', `${BASE}/pending-questions`),
+    request<{ items: PendingQuestion[]; kb_disliked: KBEntry[] }>('GET', `${BASE}/pending-questions`),
   answerPendingQuestion: (id: string, answer: string) =>
     request<{ question: PendingQuestion }>(
       'POST',
