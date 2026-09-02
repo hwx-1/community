@@ -13,11 +13,13 @@ import (
 
 	"github.com/xsnbb/server/internal/config"
 	"github.com/xsnbb/server/internal/security"
+	"gorm.io/gorm"
 )
 
 type Store struct {
 	mu                  sync.RWMutex
 	db                  *gorm.DB
+	strictPersistence   bool
 	nextID              int64
 	Accounts            map[int64]*Account
 	Phones              map[string]int64
@@ -48,11 +50,47 @@ type Store struct {
 	Appeals       map[int64]*Appeal
 }
 
+// storeSnapshot intentionally excludes login/admin sessions and SMS codes:
+// those are short-lived security state and must not survive a process restart.
+// Everything users or administrators create or change is durable.
+type storeSnapshot struct {
+	NextID                 int64                         `json:"next_id"`
+	Accounts               map[int64]*Account            `json:"accounts"`
+	Phones                 map[string]int64              `json:"phones"`
+	Posts                  map[int64]*Post               `json:"posts"`
+	Comments               map[int64]*Comment            `json:"comments"`
+	Verifications          map[int64]*Verification       `json:"verifications"`
+	Announcements          map[int64]*Announcement       `json:"announcements"`
+	Tools                  map[int64]*Tool               `json:"tools"`
+	Providers              map[int64]*AIProvider         `json:"providers"`
+	AIConversations        map[int64]*Conversation       `json:"ai_conversations"`
+	DirectConversations    map[int64]*DirectConversation `json:"direct_conversations"`
+	AuditLogs              []AuditLog                    `json:"audit_logs"`
+	Admins                 map[string]*AdminAccount      `json:"admins"`
+	AdminRoles             map[int64]*AdminRole          `json:"admin_roles"`
+	Reports                map[int64]*Report             `json:"reports"`
+	KBEntries              map[int64]*KBEntry            `json:"kb_entries"`
+	PendingQuestions       map[int64]*PendingQuestion    `json:"pending_questions"`
+	Settings               Settings                      `json:"settings"`
+	PostLikes              map[int64]map[int64]bool      `json:"post_likes"`
+	PostBookmarks          map[int64]map[int64]bool      `json:"post_bookmarks"`
+	Notifications          map[int64]*Notification       `json:"notifications"`
+	Punishments            map[int64]*Punishment         `json:"punishments"`
+	Appeals                map[int64]*Appeal             `json:"appeals"`
+	AccountPasswordHashes  map[int64]string              `json:"account_password_hashes"`
+	AdminPasswordHashes    map[string]string             `json:"admin_password_hashes"`
+	ProviderAPIKeys        map[int64]string              `json:"provider_api_keys"`
+	DirectGreetingBy       map[int64]map[int64]bool      `json:"direct_greeting_by"`
+	ReportReporterIDs      map[int64]int64               `json:"report_reporter_ids"`
+	NotificationAccountIDs map[int64]int64               `json:"notification_account_ids"`
+}
+
 func NewStore(cfg *config.Config) *Store {
 	adminHash, _ := security.HashPassword(cfg.SuperAdminPassword)
 	demoHash, _ := security.HashPassword("Demo12345")
 	s := &Store{
-		nextID: 100, Accounts: map[int64]*Account{}, Phones: map[string]int64{},
+		strictPersistence: cfg.Env == "prod",
+		nextID:            100, Accounts: map[int64]*Account{}, Phones: map[string]int64{},
 		Sessions: map[string]int64{}, AdminSessions: map[string]string{},
 		Posts: map[int64]*Post{}, Comments: map[int64]*Comment{},
 		Verifications: map[int64]*Verification{}, Announcements: map[int64]*Announcement{},
@@ -62,9 +100,9 @@ func NewStore(cfg *config.Config) *Store {
 		KBEntries: map[int64]*KBEntry{}, PendingQuestions: map[int64]*PendingQuestion{},
 		PostLikes: map[int64]map[int64]bool{}, PostBookmarks: map[int64]map[int64]bool{},
 		Notifications: map[int64]*Notification{}, Punishments: map[int64]*Punishment{},
-		Appeals: map[int64]*Appeal{},
+		Appeals:  map[int64]*Appeal{},
 		Settings: Settings{Greeting: "你好，我想和你聊聊", HotTopics: []string{"期末复习", "羽毛球", "食堂新品"}},
-		Admins: map[string]*AdminAccount{}, AdminRoles: map[int64]*AdminRole{},
+		Admins:   map[string]*AdminAccount{}, AdminRoles: map[int64]*AdminRole{},
 	}
 	now := time.Now()
 
@@ -73,36 +111,51 @@ func NewStore(cfg *config.Config) *Store {
 		s.db = ConnectDB(cfg.DatabaseURL)
 		if s.db != nil {
 			if err := Migrate(s.db); err != nil {
-				fmt.Printf("[db] migrate failed: %v\n", err)
+				if s.strictPersistence {
+					panic(fmt.Sprintf("PostgreSQL migration failed: %v", err))
+				}
+				fmt.Printf("[db] migrate failed: %v; using memory store\n", err)
 				s.db = nil
 			} else {
-				s.loadFromDB()
-				fmt.Printf("[db] loaded %d accounts, %d posts from database\n", len(s.Accounts), len(s.Posts))
+				loaded, err := s.loadSnapshot()
+				if err != nil {
+					if s.strictPersistence {
+						panic(fmt.Sprintf("PostgreSQL snapshot restore failed: %v", err))
+					}
+					fmt.Printf("[db] snapshot restore failed: %v; using fresh memory store\n", err)
+				} else if loaded {
+					fmt.Printf("[db] restored snapshot with %d accounts, %d posts\n", len(s.Accounts), len(s.Posts))
+					return s
+				}
 			}
 		}
 	}
-
-	// 如果数据库已加载数据，跳过种子数据
-	if len(s.Accounts) > 0 {
-		return s
+	if s.strictPersistence && s.db == nil {
+		panic("PostgreSQL is required when APP_ENV=prod")
 	}
 
 	s.AdminRoles[1] = &AdminRole{ID: 1, Name: "超级管理员", Permissions: []string{"*"}, Protected: true, CreatedAt: now, UpdatedAt: now}
 	s.AdminRoles[2] = &AdminRole{ID: 2, Name: "认证审核", Permissions: []string{"verification.review", "profile.private.read"}, CreatedAt: now, UpdatedAt: now}
 	s.AdminRoles[3] = &AdminRole{ID: 3, Name: "内容与举报审核", Permissions: []string{"post.moderate", "comment.moderate", "report.review", "appeal.review"}, CreatedAt: now, UpdatedAt: now}
 	s.Admins[cfg.SuperAdminUser] = &AdminAccount{ID: 1, Username: cfg.SuperAdminUser, PasswordHash: adminHash, IsSuper: true, RoleIDs: []int64{1}, Enabled: true, CreatedAt: now, UpdatedAt: now}
-	s.Accounts[1] = &Account{ID: 1, Phone: "13800000000", PasswordHash: demoHash, Nickname: "李大壮", Avatar: "李", Gender: "男", RealName: "李同学", StudentNo: "2023000042", ClassName: "计算机 2301 班", ProfileDone: true, Verified: true, Status: "active", CreatedAt: now.AddDate(0, 0, -23)}
-	s.Accounts[2] = &Account{ID: 2, Phone: "13800000001", PasswordHash: demoHash, Nickname: "王小雨", Avatar: "王", Gender: "女", ProfileDone: true, Verified: true, Status: "active", CreatedAt: now.AddDate(0, 0, -18)}
-	s.Accounts[3] = &Account{ID: 3, Phone: "13800000002", PasswordHash: demoHash, Nickname: "张同学", Avatar: "张", Gender: "男", ProfileDone: true, Verified: true, Status: "active", CreatedAt: now.AddDate(0, 0, -12)}
+	if cfg.Env != "prod" && len(s.Accounts) == 0 {
+		s.Accounts[1] = &Account{ID: 1, Phone: "13800000000", PasswordHash: demoHash, Nickname: "李大壮", Avatar: "李", Gender: "男", RealName: "李同学", StudentNo: "2023000042", ClassName: "计算机 2301 班", ProfileDone: true, Verified: true, Status: "active", CreatedAt: now.AddDate(0, 0, -23)}
+		s.Accounts[2] = &Account{ID: 2, Phone: "13800000001", PasswordHash: demoHash, Nickname: "王小雨", Avatar: "王", Gender: "女", ProfileDone: true, Verified: true, Status: "active", CreatedAt: now.AddDate(0, 0, -18)}
+		s.Accounts[3] = &Account{ID: 3, Phone: "13800000002", PasswordHash: demoHash, Nickname: "张同学", Avatar: "张", Gender: "男", ProfileDone: true, Verified: true, Status: "active", CreatedAt: now.AddDate(0, 0, -12)}
+	}
 	for id, account := range s.Accounts {
 		s.Phones[account.Phone] = id
 	}
-	s.Posts[1] = &Post{ID: 1, Author: s.public(1), Text: "【社区提示】下周起图书馆开放时间调整为 8:00–22:00，期末周延长至 23:00。", Status: "public", Pinned: true, Likes: 32, Comments: 0, Bookmarks: 12, CreatedAt: now.Add(-2 * time.Hour), UpdatedAt: now.Add(-2 * time.Hour)}
-	s.Posts[2] = &Post{ID: 2, Author: s.public(1), Text: "周六下午体育馆羽毛球局，还差 2 人，想来的评论区报名～", Images: []string{"/uploads/demo/court-1.jpg", "/uploads/demo/court-2.jpg"}, Tags: []string{"运动", "羽毛球"}, Status: "public", Likes: 8, Comments: 2, Bookmarks: 3, CreatedAt: now.Add(-25 * time.Minute), UpdatedAt: now.Add(-25 * time.Minute)}
-	s.Posts[3] = &Post{ID: 3, Author: s.public(2), Text: "高数期末复习重点整理完了，需要的同学可以自取。", Tags: []string{"学习资料", "期末复习"}, Status: "public", Likes: 21, Comments: 1, Bookmarks: 9, CreatedAt: now.Add(-time.Hour), UpdatedAt: now.Add(-time.Hour)}
-	s.Comments[1] = &Comment{ID: 1, PostID: 2, Author: s.public(2), Text: "算我一个！", Status: "public", CreatedAt: now.Add(-18 * time.Minute)}
-	s.Comments[2] = &Comment{ID: 2, PostID: 2, Author: s.public(3), Text: "新手可以参加吗？", Status: "public", CreatedAt: now.Add(-8 * time.Minute)}
-	s.Verifications[1] = &Verification{ID: 1, AccountID: 3, Nickname: "张同学", RealName: "张同学", StudentNo: "2023000066", MaterialURL: "/private/verifications/demo.jpg", Status: "pending", CreatedAt: now.Add(-8 * 24 * time.Hour)}
+	if cfg.Env != "prod" {
+		s.Posts[1] = &Post{ID: 1, Author: s.public(1), Text: "【社区提示】下周起图书馆开放时间调整为 8:00–22:00，期末周延长至 23:00。", Status: "public", Pinned: true, Likes: 32, Comments: 0, Bookmarks: 12, CreatedAt: now.Add(-2 * time.Hour), UpdatedAt: now.Add(-2 * time.Hour)}
+		s.Posts[2] = &Post{ID: 2, Author: s.public(1), Text: "周六下午体育馆羽毛球局，还差 2 人，想来的评论区报名～", Images: []string{"/uploads/demo/court-1.jpg", "/uploads/demo/court-2.jpg"}, Tags: []string{"运动", "羽毛球"}, Status: "public", Likes: 8, Comments: 2, Bookmarks: 3, CreatedAt: now.Add(-25 * time.Minute), UpdatedAt: now.Add(-25 * time.Minute)}
+		s.Posts[3] = &Post{ID: 3, Author: s.public(2), Text: "高数期末复习重点整理完了，需要的同学可以自取。", Tags: []string{"学习资料", "期末复习"}, Status: "public", Likes: 21, Comments: 1, Bookmarks: 9, CreatedAt: now.Add(-time.Hour), UpdatedAt: now.Add(-time.Hour)}
+		s.Comments[1] = &Comment{ID: 1, PostID: 2, Author: s.public(2), Text: "算我一个！", Status: "public", CreatedAt: now.Add(-18 * time.Minute)}
+		s.Comments[2] = &Comment{ID: 2, PostID: 2, Author: s.public(3), Text: "新手可以参加吗？", Status: "public", CreatedAt: now.Add(-8 * time.Minute)}
+		s.Verifications[1] = &Verification{ID: 1, AccountID: 3, Nickname: "张同学", RealName: "张同学", StudentNo: "2023000066", MaterialURL: "/private/verifications/demo.jpg", Status: "pending", CreatedAt: now.Add(-8 * 24 * time.Hour)}
+		s.DirectConversations[1] = &DirectConversation{ID: 1, MemberIDs: []int64{1, 3}, GreetingBy: map[int64]bool{3: true}, Messages: []DirectMessage{{ID: 1, SenderID: 3, Text: "我想和你聊聊", System: true, Status: "delivered", CreatedAt: now.Add(-10 * time.Minute)}}, UpdatedAt: now.Add(-10 * time.Minute)}
+		s.PendingQuestions[1] = &PendingQuestion{ID: 1, AccountID: 2, Question: "游泳馆几点关门？", Status: "open", AskCount: 3, CreatedAt: now.Add(-30 * time.Hour)}
+	}
 	publishedRecently := now.Add(-2 * time.Hour)
 	publishedEarlier := now.Add(-72 * time.Hour)
 	s.Announcements[1] = &Announcement{ID: 1, Title: "图书馆开放时间调整", Summary: "期末复习期间延长开放时间。", Body: "请同学们合理安排学习计划，具体安排以相关部门正式通知为准。", LinkURL: "https://www.syu.edu.cn/", LinkText: "查看学校官网", Published: true, CreatedAt: publishedRecently, UpdatedAt: publishedRecently, PublishedAt: &publishedRecently}
@@ -110,28 +163,50 @@ func NewStore(cfg *config.Config) *Store {
 	s.Tools[1] = &Tool{ID: 1, Name: "AI 问答", Type: "ai", Icon: "sparkles", Weight: 100, Enabled: true}
 	s.Tools[2] = &Tool{ID: 2, Name: "校园地图", Type: "map", Icon: "map", Weight: 90, Enabled: true}
 	s.Tools[3] = &Tool{ID: 3, Name: "常用网址", Type: "links", Icon: "link", Weight: 80, Enabled: true}
-	s.Providers[1] = &AIProvider{ID: 1, Name: "本地开发模型", Protocol: "openai-compatible", BaseURL: "http://localhost:9000/v1", APIKeyMasked: "••••dev", Model: "campus-demo", Enabled: true, Public: true, FallbackOrder: 1}
-	s.DirectConversations[1] = &DirectConversation{ID: 1, MemberIDs: []int64{1, 3}, GreetingBy: map[int64]bool{3: true}, Messages: []DirectMessage{{ID: 1, SenderID: 3, Text: "我想和你聊聊", System: true, Status: "delivered", CreatedAt: now.Add(-10 * time.Minute)}}, UpdatedAt: now.Add(-10 * time.Minute)}
+	if cfg.Env != "prod" {
+		s.Providers[1] = &AIProvider{ID: 1, Name: "本地开发模型", Protocol: "openai-compatible", BaseURL: "http://localhost:9000/v1", APIKeyMasked: "••••dev", Model: "campus-demo", Enabled: true, Public: true, FallbackOrder: 1}
+	}
 	s.KBEntries[1] = &KBEntry{ID: 1, Title: "教务处联系电话", Category: "phone", Content: "教务处本科教学运行科：024-6272 0000（工作日 8:30–16:30）。", Source: "学校官网-机构设置", SourceDate: "2026-06-01", Enabled: true, UpdatedAt: now.Add(-48 * time.Hour)}
 	s.KBEntries[2] = &KBEntry{ID: 2, Title: "图书馆开放时间", Category: "notice", Content: "图书馆常规开放时间为 8:00–22:00，期末周延长至 23:00，以官方通知为准。", Source: "学校图书馆公告", SourceDate: "2026-08-20", Enabled: true, UpdatedAt: now.Add(-2 * time.Hour)}
-	s.PendingQuestions[1] = &PendingQuestion{ID: 1, AccountID: 2, Question: "游泳馆几点关门？", Status: "open", AskCount: 3, CreatedAt: now.Add(-30 * time.Hour)}
+	if err := s.persistLocked(); err != nil {
+		if s.strictPersistence {
+			panic(err)
+		}
+		fmt.Printf("[db] initial snapshot failed: %v\n", err)
+	}
 	return s
 }
 
 func (s *Store) next() int64 { s.nextID++; return s.nextID }
 func (s *Store) public(id int64) PublicAccount {
 	a := s.Accounts[id]
+	if a == nil {
+		return PublicAccount{}
+	}
 	return PublicAccount{ID: a.ID, Nickname: a.Nickname, Avatar: a.Avatar, Gender: a.Gender, Verified: a.Verified}
 }
 func (s *Store) NextID() int64                        { return s.next() }
 func (s *Store) PublicAccount(id int64) PublicAccount { return s.public(id) }
-func (s *Store) MuLock(fn func())                     { s.mu.Lock(); defer s.mu.Unlock(); fn() }
-func (s *Store) MuRLock(fn func())                    { s.mu.RLock(); defer s.mu.RUnlock(); fn() }
+func (s *Store) MuLock(fn func()) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	fn()
+	if err := s.persistLocked(); err != nil {
+		if s.strictPersistence {
+			panic(err)
+		}
+		fmt.Printf("[db] persist failed: %v\n", err)
+	}
+}
+func (s *Store) MuRLock(fn func()) { s.mu.RLock(); defer s.mu.RUnlock(); fn() }
 
 func (s *Store) WithLockErr(fn func() error) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return fn()
+	if err := fn(); err != nil {
+		return err
+	}
+	return s.persistLocked()
 }
 
 func token() string {
@@ -296,9 +371,10 @@ func (s *Store) Register(phone, password, nickname string) (*Account, error) {
 	s.Accounts[id] = a
 	s.Phones[phone] = id
 
-	// 持久化到数据库
-	if s.db != nil {
-		s.db.Create(&DBAccount{ID: a.ID, Phone: a.Phone, PasswordHash: a.PasswordHash, Nickname: a.Nickname, Status: a.Status, CreatedAt: a.CreatedAt.Unix(), UpdatedAt: a.CreatedAt.Unix()})
+	if err := s.persistLocked(); err != nil {
+		delete(s.Accounts, id)
+		delete(s.Phones, phone)
+		return nil, fmt.Errorf("保存账号失败: %w", err)
 	}
 
 	return a, nil
@@ -463,6 +539,177 @@ func (s *Store) DeleteSession(t string) {
 }
 
 // ========== 数据库持久化方法 ==========
+
+func (s *Store) snapshot() storeSnapshot {
+	snap := storeSnapshot{
+		NextID: s.nextID, Accounts: s.Accounts, Phones: s.Phones, Posts: s.Posts,
+		Comments: s.Comments, Verifications: s.Verifications, Announcements: s.Announcements,
+		Tools: s.Tools, Providers: s.Providers, AIConversations: s.AIConversations,
+		DirectConversations: s.DirectConversations, AuditLogs: s.AuditLogs, Admins: s.Admins,
+		AdminRoles: s.AdminRoles, Reports: s.Reports, KBEntries: s.KBEntries,
+		PendingQuestions: s.PendingQuestions, Settings: s.Settings, PostLikes: s.PostLikes,
+		PostBookmarks: s.PostBookmarks, Notifications: s.Notifications,
+		Punishments: s.Punishments, Appeals: s.Appeals,
+		AccountPasswordHashes: map[int64]string{}, AdminPasswordHashes: map[string]string{},
+		ProviderAPIKeys: map[int64]string{}, DirectGreetingBy: map[int64]map[int64]bool{},
+		ReportReporterIDs: map[int64]int64{}, NotificationAccountIDs: map[int64]int64{},
+	}
+	for id, item := range s.Accounts {
+		snap.AccountPasswordHashes[id] = item.PasswordHash
+	}
+	for username, item := range s.Admins {
+		snap.AdminPasswordHashes[username] = item.PasswordHash
+	}
+	for id, item := range s.Providers {
+		snap.ProviderAPIKeys[id] = item.APIKey
+	}
+	for id, item := range s.DirectConversations {
+		snap.DirectGreetingBy[id] = item.GreetingBy
+	}
+	for id, item := range s.Reports {
+		snap.ReportReporterIDs[id] = item.ReporterID
+	}
+	for id, item := range s.Notifications {
+		snap.NotificationAccountIDs[id] = item.AccountID
+	}
+	return snap
+}
+
+func (s *Store) persistLocked() error {
+	if s.db == nil {
+		return nil
+	}
+	payload, err := json.Marshal(s.snapshot())
+	if err != nil {
+		return fmt.Errorf("encode snapshot: %w", err)
+	}
+	row := DBStoreSnapshot{ID: 1, Payload: string(payload)}
+	if err := s.db.Save(&row).Error; err != nil {
+		return fmt.Errorf("write snapshot: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) loadSnapshot() (bool, error) {
+	if s.db == nil {
+		return false, nil
+	}
+	var row DBStoreSnapshot
+	if err := s.db.First(&row, 1).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		return false, fmt.Errorf("load snapshot: %w", err)
+	}
+	var snap storeSnapshot
+	if err := json.Unmarshal([]byte(row.Payload), &snap); err != nil {
+		return false, fmt.Errorf("decode snapshot: %w", err)
+	}
+	s.nextID = snap.NextID
+	s.Accounts, s.Phones, s.Posts, s.Comments = snap.Accounts, snap.Phones, snap.Posts, snap.Comments
+	s.Verifications, s.Announcements, s.Tools = snap.Verifications, snap.Announcements, snap.Tools
+	s.Providers, s.AIConversations = snap.Providers, snap.AIConversations
+	s.DirectConversations, s.AuditLogs = snap.DirectConversations, snap.AuditLogs
+	s.Admins, s.AdminRoles = snap.Admins, snap.AdminRoles
+	s.Reports, s.KBEntries, s.PendingQuestions = snap.Reports, snap.KBEntries, snap.PendingQuestions
+	s.Settings, s.PostLikes, s.PostBookmarks = snap.Settings, snap.PostLikes, snap.PostBookmarks
+	s.Notifications, s.Punishments, s.Appeals = snap.Notifications, snap.Punishments, snap.Appeals
+	s.ensureMaps()
+	for id, value := range snap.AccountPasswordHashes {
+		if s.Accounts[id] != nil {
+			s.Accounts[id].PasswordHash = value
+		}
+	}
+	for username, value := range snap.AdminPasswordHashes {
+		if s.Admins[username] != nil {
+			s.Admins[username].PasswordHash = value
+		}
+	}
+	for id, value := range snap.ProviderAPIKeys {
+		if s.Providers[id] != nil {
+			s.Providers[id].APIKey = value
+		}
+	}
+	for id, value := range snap.DirectGreetingBy {
+		if s.DirectConversations[id] != nil {
+			s.DirectConversations[id].GreetingBy = value
+		}
+	}
+	for id, value := range snap.ReportReporterIDs {
+		if s.Reports[id] != nil {
+			s.Reports[id].ReporterID = value
+		}
+	}
+	for id, value := range snap.NotificationAccountIDs {
+		if s.Notifications[id] != nil {
+			s.Notifications[id].AccountID = value
+		}
+	}
+	return true, nil
+}
+
+func (s *Store) ensureMaps() {
+	if s.Accounts == nil {
+		s.Accounts = map[int64]*Account{}
+	}
+	if s.Phones == nil {
+		s.Phones = map[string]int64{}
+	}
+	if s.Posts == nil {
+		s.Posts = map[int64]*Post{}
+	}
+	if s.Comments == nil {
+		s.Comments = map[int64]*Comment{}
+	}
+	if s.Verifications == nil {
+		s.Verifications = map[int64]*Verification{}
+	}
+	if s.Announcements == nil {
+		s.Announcements = map[int64]*Announcement{}
+	}
+	if s.Tools == nil {
+		s.Tools = map[int64]*Tool{}
+	}
+	if s.Providers == nil {
+		s.Providers = map[int64]*AIProvider{}
+	}
+	if s.AIConversations == nil {
+		s.AIConversations = map[int64]*Conversation{}
+	}
+	if s.DirectConversations == nil {
+		s.DirectConversations = map[int64]*DirectConversation{}
+	}
+	if s.Admins == nil {
+		s.Admins = map[string]*AdminAccount{}
+	}
+	if s.AdminRoles == nil {
+		s.AdminRoles = map[int64]*AdminRole{}
+	}
+	if s.Reports == nil {
+		s.Reports = map[int64]*Report{}
+	}
+	if s.KBEntries == nil {
+		s.KBEntries = map[int64]*KBEntry{}
+	}
+	if s.PendingQuestions == nil {
+		s.PendingQuestions = map[int64]*PendingQuestion{}
+	}
+	if s.PostLikes == nil {
+		s.PostLikes = map[int64]map[int64]bool{}
+	}
+	if s.PostBookmarks == nil {
+		s.PostBookmarks = map[int64]map[int64]bool{}
+	}
+	if s.Notifications == nil {
+		s.Notifications = map[int64]*Notification{}
+	}
+	if s.Punishments == nil {
+		s.Punishments = map[int64]*Punishment{}
+	}
+	if s.Appeals == nil {
+		s.Appeals = map[int64]*Appeal{}
+	}
+}
 
 func (s *Store) loadFromDB() {
 	if s.db == nil {

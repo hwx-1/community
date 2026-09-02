@@ -7,7 +7,7 @@ set -e
 # ===== 配置区（编辑这几行） =====
 DOMAIN="xsnbb.xyz"
 EMAIL="your-email@example.com"   # 用于 Let's Encrypt 证书通知
-REPO_URL="https://github.com/yourname/xsnbb.git"  # 你的仓库地址，或手动上传
+REPO_URL="https://github.com/hwx-1/community.git"
 # =================================
 
 echo "===== 沈阳大学校园社区生产部署脚本 ====="
@@ -63,22 +63,32 @@ if [ ! -f ".env" ]; then
     exit 1
 fi
 
-# 从 .env 读取 DOMAIN
-export $(grep -v '^#' .env | xargs)
+# Compose 会自行读取 .env；这里只读取非敏感的域名用于证书配置。
+DOMAIN_FROM_ENV="$(sed -n 's/^DOMAIN=//p' .env | tail -n 1)"
+if [ -n "$DOMAIN_FROM_ENV" ]; then
+    DOMAIN="$DOMAIN_FROM_ENV"
+fi
 
 # ---- 6. 构建并启动服务 ----
 echo "[6/8] 构建 Docker 镜像并启动..."
-docker compose -f docker-compose.prod.yml down 2>/dev/null || true
-docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml config --quiet
+docker compose -f docker-compose.prod.yml build
+docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
 # 等待服务启动
 echo "等待服务就绪..."
-sleep 5
-if curl -sf http://127.0.0.1:8080/api/v1/capabilities > /dev/null; then
-    echo "✅ 后端服务运行正常"
-else
-    echo "⚠️  后端服务可能尚未就绪，请检查日志: docker logs xsnbb"
-fi
+for i in $(seq 1 24); do
+    if curl -sf http://127.0.0.1:8080/api/v1/capabilities > /dev/null; then
+        echo "✅ 后端服务运行正常"
+        break
+    fi
+    if [ "$i" -eq 24 ]; then
+        echo "❌ 后端服务未通过健康检查"
+        docker compose -f docker-compose.prod.yml logs --tail=200 xsnbb
+        exit 1
+    fi
+    sleep 5
+done
 
 # ---- 7. 配置 Nginx ----
 echo "[7/8] 配置 Nginx..."

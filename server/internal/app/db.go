@@ -25,18 +25,19 @@ func ConnectDB(dsn string) *gorm.DB {
 
 // Migrate 自动创建或更新数据库表。
 func Migrate(db *gorm.DB) error {
-	return db.AutoMigrate(
-		&DBAccount{},
-		&DBProfile{},
-		&DBPost{},
-		&DBComment{},
-		&DBAdminAccount{},
-		&DBRole{},
-		&DBPermission{},
-		&DBAdminAuditLog{},
-		&DBStudentVerification{},
-		&DBStudentBinding{},
-	)
+	// The repository already ships SQL-managed relational tables whose column
+	// types differ from the abandoned prototype models below. Do not let
+	// AutoMigrate rewrite those production tables; only manage our own snapshot.
+	return db.AutoMigrate(&DBStoreSnapshot{})
+}
+
+// DBStoreSnapshot stores the durable portion of the in-memory store as one
+// JSON document. The API keeps its existing low-latency map-based reads while
+// every mutation is synchronously checkpointed to PostgreSQL.
+type DBStoreSnapshot struct {
+	ID        uint   `gorm:"primaryKey"`
+	Payload   string `gorm:"type:jsonb;not null"`
+	UpdatedAt int64  `gorm:"autoUpdateTime"`
 }
 
 // ========== GORM 模型 ==========
@@ -52,12 +53,12 @@ type DBAccount struct {
 }
 
 type DBProfile struct {
-	AccountID  int64  `gorm:"primaryKey"`
-	AvatarURL  string
-	Gender     string
-	RealName   string
-	StudentNo  string
-	ClassName  string
+	AccountID   int64 `gorm:"primaryKey"`
+	AvatarURL   string
+	Gender      string
+	RealName    string
+	StudentNo   string
+	ClassName   string
 	ProfileDone bool `gorm:"default:false"`
 }
 
@@ -77,8 +78,8 @@ type DBPost struct {
 }
 
 type DBComment struct {
-	ID        int64  `gorm:"primaryKey"`
-	PostID    int64  `gorm:"index"`
+	ID        int64 `gorm:"primaryKey"`
+	PostID    int64 `gorm:"index"`
 	ParentID  *int64
 	AuthorID  int64  `gorm:"index"`
 	Text      string `gorm:"type:text"`

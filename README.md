@@ -4,7 +4,7 @@
 
 | 部分 | 目录 | 技术 | 端口 |
 | --- | --- | --- | --- |
-| Go API | `server/` | Go + Gin（内存本地数据实现 + 外部服务适配层） | 8080 |
+| Go API | `server/` | Go + Gin（内存热状态 + PostgreSQL 持久化快照） | 8080 |
 | 社区 Web | `apps/web/` | React 18 + Vite + CSS Modules | 5173 |
 | 管理后台 | `apps/admin/` | React 18 + Vite + Ant Design 5 | 5174 |
 | iOS / Android App | `apps/mobile/` | React Native 0.87 + TypeScript | Metro 8081 |
@@ -42,14 +42,16 @@ corepack pnpm build:harmony
 # 并把 AppConfig.ets 中的 API_BASE_URL 改为局域网 IP，详见 apps/harmony/README.md
 ```
 
-## 内置账号（内存种子数据，重启即重置）
+## 内置账号（仅本地开发环境创建）
 
 | 角色 | 登录方式 | 说明 |
 | --- | --- | --- |
 | 学生（已认证） | 手机 `13800000000` / 密码 `Demo12345` | 昵称「李大壮」，可直接发帖 |
 | 学生（已认证） | 手机 `13800000001` / 密码 `Demo12345` | 昵称「王小雨」 |
 | 学生（已认证） | 手机 `13800000002` / 密码 `Demo12345` | 昵称「张同学」 |
-| 超级管理员 | 后台登录名 `admin` / 密码 `Admin12345` | 由 `SUPER_ADMIN_USER/PASSWORD` 首次创建 |
+| 超级管理员 | 后台登录名和密码来自环境变量 | 由 `SUPER_ADMIN_USER/PASSWORD` 在数据库首次初始化时创建 |
+
+生产环境不会创建上述三个已知密码的学生演示账号，也不会创建本地演示 AI Provider。
 
 注册新账号：邀请码默认 `xsnbb-test`；开发模式短信验证码直接随 `sms-code` 接口响应的 `dev_code` 字段返回（真实短信未接入，属明确的开发行为）。
 
@@ -73,6 +75,6 @@ corepack pnpm --filter @xsnbb/mobile test
 
 ## 数据说明
 
-首版 API 使用**内存本地数据实现**（`server/internal/app/store.go`），进程重启即重置；
-`server/migrations/001_init.up.sql` 与 `infra/docker-compose.dev.yml`（PostgreSQL + Redis）
-为后续切换到 GORM + goose 持久化保留，当前运行不依赖数据库。
+开发环境没有 PostgreSQL 时可使用纯内存模式。`APP_ENV=prod` 时 PostgreSQL 是强制依赖：
+API 继续从内存 map 读取，并在每次业务写操作后同步保存完整业务快照；容器重启后从
+PostgreSQL 恢复。登录会话和短信验证码属于短期安全状态，不跨进程重启保留。

@@ -2,19 +2,17 @@
 
 架构：单个 Go 进程同时提供 API、社区 Web（`/`）和管理后台（`/admin/`），Nginx 只做 HTTPS 终结与反代。
 
-## 方式 A：Docker（推荐）
+## 方式 A：Docker Compose（推荐）
 
 ```bash
-# 在仓库根目录
-docker build -f infra/Dockerfile -t xsnbb .
-docker run -d --name xsnbb --restart unless-stopped \
-  -p 127.0.0.1:8080:8080 \
-  -v xsnbb-data:/data \
-  -e SESSION_SECRET='换成足够长的随机串' \
-  -e SUPER_ADMIN_USER=admin \
-  -e SUPER_ADMIN_PASSWORD='换成强密码' \
-  -e INVITE_CODE='内测邀请码' \
-  xsnbb
+cd /opt/xsnbb/infra
+cp .env.example.prod .env
+# 编辑 .env；随机十六进制值可用 openssl rand -hex 32 生成
+chmod 600 .env
+docker compose -f docker-compose.prod.yml config --quiet
+docker compose -f docker-compose.prod.yml build
+docker compose -f docker-compose.prod.yml up -d
+curl -fsS http://127.0.0.1:8080/api/v1/capabilities
 ```
 
 ## 方式 B：裸二进制
@@ -81,7 +79,8 @@ sudo certbot --nginx -d xsnbb.xyz -d www.xsnbb.xyz
 
 ## 上线前核对清单
 
-- [ ] `SESSION_SECRET`、`SUPER_ADMIN_PASSWORD` 已换成强随机值（超管密码仅首次启动创建时生效）
+- [ ] `SESSION_SECRET`、`POSTGRES_PASSWORD`、`SUPER_ADMIN_PASSWORD` 和 `INVITE_CODE` 均已换成独立强随机值（超管密码仅首次初始化生效）
 - [ ] 短信（`SMS_*`）、OSS（`OSS_*`）、联网检索（`SEARCH_*`）真实凭证已注入；未注入的项会以 dev_mode 明确降级，不会伪装成功
 - [ ] 内容审核仍是内置演示违禁词 —— **对真实用户开放发帖前必须接入独立审核服务**
-- [ ] 数据为内存实现，进程重启即清空 —— 正式运营前需切换到 PostgreSQL（migrations 已预留）
+- [x] 业务数据同步写入 PostgreSQL 快照；生产环境数据库不可用时拒绝启动，避免静默退回内存
+- [ ] 已执行一次“创建内容 → 重启 xsnbb → 内容仍存在”的验收

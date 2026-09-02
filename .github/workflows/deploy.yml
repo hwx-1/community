@@ -4,8 +4,24 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: production
+  cancel-in-progress: false
+
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+          cache-dependency-path: server/go.sum
+      - name: Test backend
+        run: go -C server test ./...
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -17,11 +33,24 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          fingerprint: ${{ secrets.SSH_FINGERPRINT }}
           script: |
+            set -eu
             cd /opt/xsnbb
-            git pull origin main
+            git pull --ff-only origin main
             cd infra
-            docker compose -f docker-compose.prod.yml down
-            docker compose -f docker-compose.prod.yml up -d --build
+            docker compose -f docker-compose.prod.yml config --quiet
+            docker compose -f docker-compose.prod.yml build
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            for i in $(seq 1 24); do
+              if curl -fsS http://127.0.0.1:8080/api/v1/capabilities >/dev/null; then
+                break
+              fi
+              if [ "$i" -eq 24 ]; then
+                docker compose -f docker-compose.prod.yml logs --tail=200 xsnbb
+                exit 1
+              fi
+              sleep 5
+            done
             docker image prune -f
             echo "Deployed at $(date)"

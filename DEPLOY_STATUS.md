@@ -34,7 +34,7 @@
 
 ### 可视化与管理
 - [x] Portainer 安装（Docker 可视化管理）
-- [x] 超管账号配置（admin / @Hwx15721733287）
+- [x] 超管账号配置（用户名 admin；密码不再记录在仓库文档中）
 
 ### CI/CD
 - [x] GitHub Actions workflow 配置文件已创建（.github/workflows/deploy.yml）
@@ -43,22 +43,18 @@
 
 ## 三、未完成事项 ⏳
 
-### 高优先级（影响数据持久化）
-- [ ] **后端代码切换到 PostgreSQL**
-  - 当前状态：后端仍使用内存存储（map），重启容器数据丢失
-  - 数据库已就绪，需要改 Go 代码让 Store 读写走 PostgreSQL
-  - 涉及文件：server/internal/app/store.go, server/internal/app/models.go
-  - 方案：混合模式（内存缓存 + DB 持久化）
-
-- [ ] **GORM 依赖安装**
-  - 服务器宿主机没有 Go 环境
-  - 需要用 Docker golang 容器执行 `go get gorm.io/gorm gorm.io/driver/postgres`
+### 高优先级（代码已完成，等待部署验收）
+- [x] **后端切换为内存热状态 + PostgreSQL 同步持久化快照**
+  - 所有业务写操作会同步保存；账号/管理员密码哈希等内部字段也纳入快照
+  - 生产环境数据库不可用时应用拒绝启动，不再静默使用易丢数据的内存模式
+  - 登录会话和短信验证码按安全设计不跨重启保留
+- [x] **GORM 与 PostgreSQL 驱动加入 go.mod/go.sum**
+- [ ] **服务器验收**：创建测试内容，重启应用容器，确认内容仍存在
 
 ### 中优先级（影响真实用户使用）
-- [ ] **GitHub Actions 自动部署配置**
-  - workflow 文件已创建，但服务器 SSH 密钥之前泄露
-  - 需要重新生成密钥对，更新 GitHub Secret
-  - 完成后可实现 push 即部署
+- [ ] **GitHub Actions 自动部署密钥轮换**
+  - workflow 已加入测试门禁、SSH 主机指纹校验、部署健康检查，且不再先停服再构建
+  - 仍需在服务器删除泄露的旧公钥，生成部署专用密钥，并更新 GitHub Secrets
 
 - [ ] **阿里云内容安全接入**
   - 当前使用内置演示违禁词（BANNED_WORDS）
@@ -86,22 +82,44 @@
 
 ## 四、如何更新代码并部署到服务器
 
-### 方式一：手动部署（当前可用）
+### 方式一：首次部署本次持久化更新（当前可用）
 
 ```bash
 # 1. SSH 登录服务器（Workbench 或本地终端）
 ssh root@39.106.198.88
 
-# 2. 拉取最新代码
+# 2. 先备份数据库
+mkdir -p /opt/backups
+docker exec xsnbb-db pg_dump -U xsnbb -d xsnbb -Fc > /opt/backups/xsnbb-before-persistence.dump
+
+# 3. 拉取最新代码
 cd /opt/xsnbb
-git pull origin main
+git pull --ff-only origin main
 
-# 3. 重新构建并启动
+# 4. 创建生产配置并填写所有必填值（已有 .env 则逐项补 POSTGRES_PASSWORD）
 cd infra
-docker compose -f docker-compose.prod.yml down
-docker compose -f docker-compose.prod.yml up -d --build
+cp -n .env.example.prod .env
+chmod 600 .env
+editor .env
 
-# 4. 清理旧镜像（释放空间）
+# 现有 pgdata 使用过旧的硬编码密码；首次升级必须同步轮换数据库角色密码。
+# 下面生成的是十六进制密码，可安全放入 PostgreSQL URL。
+NEW_DB_PASSWORD="$(openssl rand -hex 32)"
+docker exec xsnbb-db psql -U xsnbb -d xsnbb -c "ALTER ROLE xsnbb WITH PASSWORD '$NEW_DB_PASSWORD';"
+sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$NEW_DB_PASSWORD/" .env
+unset NEW_DB_PASSWORD
+
+# 5. 先构建，成功后再替换容器
+docker compose -f docker-compose.prod.yml config --quiet
+docker compose -f docker-compose.prod.yml build
+docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+# 6. 健康检查与日志
+curl -fsS http://127.0.0.1:8080/api/v1/capabilities
+docker compose -f docker-compose.prod.yml ps
+docker compose -f docker-compose.prod.yml logs --tail=200 xsnbb
+
+# 7. 清理旧镜像（释放空间）
 docker image prune -f
 ```
 
@@ -156,19 +174,19 @@ free -h
 | 服务 | 地址 | 账号 |
 |-----|------|------|
 | 社区首页 | https://xsnbb.xyz | 注册/手机号登录 |
-| 管理后台 | https://xsnbb.xyz/admin/ | admin / @Hwx15721733287 |
-| 学生测试号 | - | 13800000000 / Demo12345 |
+| 管理后台 | https://xsnbb.xyz/admin/ | admin / 以服务器 `infra/.env` 中首次初始化的密码为准 |
+| 学生测试号 | 仅本地开发环境 | 生产环境不再创建已知密码的演示账号 |
 | Portainer | http://39.106.198.88:9000 | 首次访问设置密码 |
 
 ---
 
 ## 七、下一步建议
 
-1. **先完成 GORM 依赖安装**（用 Docker golang 容器）
-2. **然后修改 Store 代码**，添加数据库持久化
-3. **重新生成 GitHub Actions SSH 密钥**（旧密钥已泄露）
-4. **测试自动部署**
-5. **接入阿里云内容安全**（真实用户前必须完成）
+1. 部署当前代码并完成重启持久化验收
+2. 立即轮换文档中曾出现过的超管密码和泄露的 SSH 密钥
+3. 配置 `SSH_HOST`、`SSH_USER`、`SSH_PRIVATE_KEY`、`SSH_FINGERPRINT` 四个 GitHub Secrets 并测试自动部署
+4. 取得阿里云短信签名/模板、OSS Bucket、内容安全服务和 RAM 最小权限凭证后完成真实接口接入
+5. 真实用户开放注册/发帖前，确认 `/api/v1/capabilities` 不再显示相关能力处于开发模式
 
 ---
 
