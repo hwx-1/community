@@ -4,6 +4,7 @@
 package adapters
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -122,12 +123,20 @@ type ChatMessage struct {
 type AI interface {
 	// Chat 调用模型完成一次问答。开发模式返回明确的占位回答。
 	Chat(ctx context.Context, baseURL, apiKey, model string, messages []ChatMessage) (string, error)
+	// StreamChat 以 OpenAI 兼容流式协议返回增量回答：onDelta 依次收到思考增量与正文增量。
+	StreamChat(ctx context.Context, baseURL, apiKey, model string, messages []ChatMessage, onDelta func(reasoningDelta, contentDelta string)) error
 }
 
-type openaiCompatAI struct{ client *http.Client }
+type openaiCompatAI struct {
+	client       *http.Client
+	streamClient *http.Client
+}
 
 func newOpenAICompatAI() *openaiCompatAI {
-	return &openaiCompatAI{client: &http.Client{Timeout: 30 * time.Second}}
+	return &openaiCompatAI{
+		client:       &http.Client{Timeout: 30 * time.Second},
+		streamClient: &http.Client{},
+	}
 }
 
 type chatRequest struct {
@@ -174,6 +183,73 @@ func (o *openaiCompatAI) Chat(ctx context.Context, baseURL, apiKey, model string
 		return "", errors.New("供应商未返回候选回答")
 	}
 	return out.Choices[0].Message.Content, nil
+}
+
+type chatStreamRequest struct {
+	Model    string        `json:"model"`
+	Messages []ChatMessage `json:"messages"`
+	Stream   bool          `json:"stream"`
+}
+
+type chatStreamChunk struct {
+	Choices []struct {
+		Delta struct {
+			ReasoningContent string `json:"reasoning_content"`
+			Reasoning        string `json:"reasoning"`
+			Content          string `json:"content"`
+		} `json:"delta"`
+	} `json:"choices"`
+}
+
+func (o *openaiCompatAI) StreamChat(ctx context.Context, baseURL, apiKey, model string, messages []ChatMessage, onDelta func(reasoningDelta, contentDelta string)) error {
+	if baseURL == "" || apiKey == "" {
+		return errors.New("AI_PROVIDER_NOT_CONFIGURED")
+	}
+	body, _ := json.Marshal(chatStreamRequest{Model: model, Messages: messages, Stream: true})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(baseURL, "/")+"/chat/completions", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "text/event-stream")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	resp, err := o.streamClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<16))
+		return fmt.Errorf("供应商返回 %d: %s", resp.StatusCode, strings.TrimSpace(string(raw)))
+	}
+	scanner := bufio.NewScanner(resp.Body)
+	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		if data == "[DONE]" {
+			break
+		}
+		var chunk chatStreamChunk
+		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
+			continue
+		}
+		if len(chunk.Choices) == 0 {
+			continue
+		}
+		delta := chunk.Choices[0].Delta
+		reasoning := delta.ReasoningContent
+		if reasoning == "" {
+			reasoning = delta.Reasoning
+		}
+		if reasoning != "" || delta.Content != "" {
+			onDelta(reasoning, delta.Content)
+		}
+	}
+	return scanner.Err()
 }
 
 // ---- 聚合 ----

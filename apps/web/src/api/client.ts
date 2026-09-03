@@ -83,11 +83,21 @@ export interface AIMessage {
   id: number
   role: 'user' | 'assistant'
   text: string
+  reasoning?: string
   model?: string
   source?: string
   needs_feedback?: boolean
   feedback?: 'yes' | 'no'
   created_at: string
+}
+
+export interface AIStreamEvent {
+  type: 'thinking' | 'text' | 'done' | 'error'
+  delta?: string
+  message?: string
+  user_message?: AIMessage
+  answer?: AIMessage
+  remaining?: number
 }
 
 export interface AIConversation {
@@ -194,6 +204,30 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   return data as T
 }
 
+async function streamSSE(path: string, body: unknown, onEvent: (data: string) => void): Promise<void> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken(), Accept: 'text/event-stream' }
+  const resp = await fetch(path, { method: 'POST', headers, credentials: 'same-origin', body: JSON.stringify(body) })
+  if (!resp.ok || !resp.body) {
+    const data = await resp.json().catch(() => ({}))
+    const err = (data as { error?: { code?: string; message?: string } }).error
+    throw new ApiError(resp.status, err?.code ?? 'UNKNOWN', err?.message ?? '请求失败，请稍后重试')
+  }
+  const reader = resp.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() ?? ''
+    for (const raw of lines) {
+      const line = raw.trim()
+      if (line.startsWith('data:')) onEvent(line.slice(5).trim())
+    }
+  }
+}
+
 export interface ModerationInfo {
   pass: boolean
   category?: string
@@ -227,12 +261,14 @@ export const api = {
     request<{ unread: number }>('POST', '/api/v1/me/notifications/read', { ids: ids ?? [] }),
 
   // 帖子与互动
-  listPosts: (params?: { q?: string; mine?: boolean }) => {
+  listPosts: (params?: { q?: string; mine?: boolean; limit?: number; offset?: number }) => {
     const search = new URLSearchParams()
     if (params?.q) search.set('q', params.q)
     if (params?.mine) search.set('mine', '1')
+    if (params?.limit != null) search.set('limit', String(params.limit))
+    if (params?.offset != null) search.set('offset', String(params.offset))
     const suffix = search.toString() ? `?${search}` : ''
-    return request<{ items: Post[] }>('GET', `/api/v1/posts${suffix}`)
+    return request<{ items: Post[]; total: number; has_more: boolean }>('GET', `/api/v1/posts${suffix}`)
   },
   getPost: (id: number) => request<{ post: Post }>('GET', `/api/v1/posts/${id}`),
   createPost: (input: { text: string; images: string[]; tags: string[] }) =>
@@ -276,6 +312,16 @@ export const api = {
   deleteAIConversation: (id: number) => request<void>('DELETE', `/api/v1/ai/conversations/${id}`),
   askAI: (id: number, text: string, model?: string) =>
     request<{ user_message: AIMessage; answer: AIMessage; remaining: number }>('POST', `/api/v1/ai/conversations/${id}/messages`, { text, model }),
+  askAIStream: async (id: number, text: string, model: string | undefined, onEvent: (event: AIStreamEvent) => void) => {
+    await streamSSE(`/api/v1/ai/conversations/${id}/messages/stream`, { text, model }, (data) => {
+      if (!data || data === '[DONE]') return
+      try {
+        onEvent(JSON.parse(data) as AIStreamEvent)
+      } catch {
+        // 忽略无法解析的事件行
+      }
+    })
+  },
   aiFeedback: (id: number, mid: number, satisfied: boolean) =>
     request<{ answer?: AIMessage; remaining: number }>('POST', `/api/v1/ai/conversations/${id}/messages/${mid}/feedback`, { satisfied }),
 

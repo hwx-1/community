@@ -136,15 +136,17 @@ type Conversation struct {
 	CreatedAt time.Time   `json:"created_at"`
 }
 type AIMessage struct {
-	ID        int64     `json:"id"`
-	Role      string    `json:"role"`
-	Text      string    `json:"text"`
-	Model     string    `json:"model,omitempty"`
-	Source    string    `json:"source,omitempty"`
+	ID   int64  `json:"id"`
+	Role string `json:"role"`
+	Text string `json:"text"`
+	// Reasoning 保存模型在给出最终答案前的思考过程（流式返回的 reasoning_content）。
+	Reasoning string `json:"reasoning,omitempty"`
+	Model     string `json:"model,omitempty"`
+	Source    string `json:"source,omitempty"`
 	// NeedsFeedback 为 true 表示这是知识库直接命中的答案，等待用户确认
 	// 「这个答案是你想要的吗？」；确认后清零并记录 Feedback（"yes"/"no"）。
-	NeedsFeedback bool      `json:"needs_feedback,omitempty"`
-	Feedback      string    `json:"feedback,omitempty"`
+	NeedsFeedback bool   `json:"needs_feedback,omitempty"`
+	Feedback      string `json:"feedback,omitempty"`
 	// RetryOf 非零表示这是对消息 RetryOf 的「不满意重答」：
 	// 知识库答错后的补救不应再扣当日额度，额度统计会跳过此类消息。
 	RetryOf int64 `json:"retry_of,omitempty"`
@@ -194,13 +196,13 @@ type Report struct {
 
 // KBEntry 校内知识库：部门电话、官方通知等人工维护资料。
 type KBEntry struct {
-	ID         int64     `json:"id"`
-	Title      string    `json:"title"`
-	Category   string    `json:"category"` // phone / notice / faq
-	Content    string    `json:"content"`
-	Source     string    `json:"source"`      // 来源说明，如「学校官网-校长办公室」
-	SourceDate string    `json:"source_date"` // 来源发布日期
-	Enabled    bool      `json:"enabled"`
+	ID         int64  `json:"id"`
+	Title      string `json:"title"`
+	Category   string `json:"category"` // phone / notice / faq
+	Content    string `json:"content"`
+	Source     string `json:"source"`      // 来源说明，如「学校官网-校长办公室」
+	SourceDate string `json:"source_date"` // 来源发布日期
+	Enabled    bool   `json:"enabled"`
 	// Dislikes 用户在答案确认中点「否」的次数，用于后台发现质量不佳的条目；
 	// LastDislikeAt 最近一次被点「否」的时间。
 	Dislikes      int        `json:"dislikes"`

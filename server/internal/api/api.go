@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -112,6 +113,7 @@ func (a *API) Register(r *gin.Engine) {
 	act.POST("/ai/conversations", a.csrf(), a.createAIConversation)
 	act.DELETE("/ai/conversations/:id", a.csrf(), a.deleteAIConversation)
 	act.POST("/ai/conversations/:id/messages", a.csrf(), a.askAI)
+	act.POST("/ai/conversations/:id/messages/stream", a.csrf(), a.askAIStream)
 	act.POST("/ai/conversations/:id/messages/:mid/feedback", a.csrf(), a.aiFeedback)
 
 	admin := v1.Group("/admin")
@@ -472,11 +474,30 @@ func (a *API) listPosts(c *gin.Context) {
 		id := account.ID
 		mine = &id
 	}
+	// limit 缺省为 0，表示不限制（兼容个人主页/搜索等不传分页的场景）
+	limit := 0
+	offset := 0
+	if v, err := strconv.Atoi(c.Query("limit")); err == nil && v > 0 {
+		limit = v
+	}
+	if v, err := strconv.Atoi(c.Query("offset")); err == nil && v >= 0 {
+		offset = v
+	}
 	a.store.MuRLock(func() {
 		posts := a.store.ListPostsUnlocked(c.Query("q"), mine)
+		total := len(posts)
+		start := offset
+		if start > total {
+			start = total
+		}
+		end := total
+		if limit > 0 && start+limit < end {
+			end = start + limit
+		}
+		posts = posts[start:end]
 		thumbPostImages(posts)
 		a.store.DecoratePosts(posts, account.ID)
-		c.JSON(200, gin.H{"items": posts})
+		c.JSON(200, gin.H{"items": posts, "total": total, "has_more": end < total})
 	})
 }
 func (a *API) createPost(c *gin.Context) {
@@ -1136,6 +1157,161 @@ func (a *API) askAI(c *gin.Context) {
 		}
 		c.JSON(200, gin.H{"user_message": user, "answer": answer, "remaining": remaining - 1})
 	})
+}
+
+// askAIStream 以 SSE 流式返回 AI 回答：先下发思考增量，再下发正文增量，
+// 最后以 done 事件返回落库后的用户消息与回答（含 remaining）。知识库命中时直接下发全文。
+func (a *API) askAIStream(c *gin.Context) {
+	id, ok := idParam(c)
+	if !ok {
+		return
+	}
+	account := current(c)
+	var in struct{ Text, Model string }
+	if c.ShouldBindJSON(&in) != nil || strings.TrimSpace(in.Text) == "" {
+		fail(c, 422, "QUESTION_INVALID", "问题不能为空")
+		return
+	}
+	question := strings.TrimSpace(in.Text)
+	model := in.Model
+	if model == "" {
+		model = "campus-demo"
+	}
+	now := time.Now()
+
+	var (
+		user      app.AIMessage
+		remaining int
+		kbAnswer  *app.AIMessage
+		history   []app.AIMessage
+		providers []app.AIProvider
+		failed    bool
+	)
+	a.store.MuLock(func() {
+		conv, exists := a.store.AIConversations[id]
+		if !exists || conv.OwnerID != account.ID {
+			fail(c, 404, "CONVERSATION_NOT_FOUND", "会话不存在")
+			failed = true
+			return
+		}
+		remaining = 10 - countAnswersTodayUnlocked(a.store.AIConversations, account.ID)
+		if remaining <= 0 {
+			fail(c, 429, "AI_QUOTA_EXHAUSTED", "今日问答额度已用完")
+			failed = true
+			return
+		}
+		user = app.AIMessage{ID: a.store.NextID(), Role: "user", Text: question, CreatedAt: now}
+		for _, e := range a.store.KBEntries {
+			if !e.Enabled {
+				continue
+			}
+			if kbMatch(e, question) {
+				answer := app.AIMessage{ID: a.store.NextID(), Role: "assistant", Text: e.Content, Model: model, Source: fmt.Sprintf("校内资料 · %s（%s）", e.Source, e.SourceDate), NeedsFeedback: true, KBEntryID: e.ID, CreatedAt: now}
+				conv.Messages = append(conv.Messages, user, answer)
+				conv.Model = model
+				if conv.Title == "新会话" {
+					conv.Title = truncateRunes(question, 20)
+				}
+				kbAnswer = &answer
+				return
+			}
+		}
+		conv.Messages = append(conv.Messages, user)
+		conv.Model = model
+		if conv.Title == "新会话" {
+			conv.Title = truncateRunes(question, 20)
+		}
+		history = append(history, conv.Messages...)
+		providers = enabledProviders(a.store.Providers, model)
+	})
+	if failed {
+		return
+	}
+
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("Connection", "keep-alive")
+	c.Writer.Header().Set("X-Accel-Buffering", "no")
+	c.Writer.WriteHeader(http.StatusOK)
+	flusher, _ := c.Writer.(http.Flusher)
+
+	writeEvent := func(payload any) {
+		b, err := json.Marshal(payload)
+		if err != nil {
+			return
+		}
+		_, _ = c.Writer.Write([]byte("data: " + string(b) + "\n\n"))
+		if flusher != nil {
+			flusher.Flush()
+		}
+	}
+
+	if kbAnswer != nil {
+		writeEvent(gin.H{"type": "text", "delta": kbAnswer.Text})
+		writeEvent(gin.H{"type": "done", "user_message": user, "answer": *kbAnswer, "remaining": remaining - 1})
+		return
+	}
+
+	emit := func(reasoningDelta, contentDelta string) {
+		if reasoningDelta != "" {
+			writeEvent(gin.H{"type": "thinking", "delta": reasoningDelta})
+		}
+		if contentDelta != "" {
+			writeEvent(gin.H{"type": "text", "delta": contentDelta})
+		}
+	}
+
+	answerText, reasoning, source, needRecord, streamErr := a.streamGenerate(c.Request.Context(), question, history, providers, emit)
+
+	// 流式中断（已输出部分内容后失败）：不落库、不扣额度，仅下发错误事件。
+	if streamErr != nil {
+		writeEvent(gin.H{"type": "error", "message": "回答中断，本次不扣额度"})
+		return
+	}
+
+	a.store.MuLock(func() {
+		conv, exists := a.store.AIConversations[id]
+		if !exists || conv.OwnerID != account.ID {
+			writeEvent(gin.H{"type": "error", "message": "会话已被删除"})
+			return
+		}
+		answer := app.AIMessage{ID: a.store.NextID(), Role: "assistant", Text: answerText, Reasoning: reasoning, Model: model, Source: source, CreatedAt: now}
+		conv.Messages = append(conv.Messages, answer)
+		if needRecord {
+			recordPendingQuestion(a.store, account.ID, question)
+		}
+		writeEvent(gin.H{"type": "done", "user_message": user, "answer": answer, "remaining": remaining - 1})
+	})
+}
+
+// streamGenerate 流式回答管线：优先走大模型流式输出，失败或不可用时退回非流式 generateAnswer。
+func (a *API) streamGenerate(ctx context.Context, question string, history []app.AIMessage, providers []app.AIProvider, emit func(reasoningDelta, contentDelta string)) (text, reasoning, source string, needRecord bool, err error) {
+	if len(providers) > 0 {
+		messages := buildChatMessages(history)
+		for _, p := range providers {
+			var tb, rb strings.Builder
+			emitted := false
+			streamErr := a.adapters.AI.StreamChat(ctx, p.BaseURL, p.APIKey, p.Model, messages, func(rd, cd string) {
+				emitted = true
+				if rd != "" {
+					rb.WriteString(rd)
+				}
+				if cd != "" {
+					tb.WriteString(cd)
+				}
+				emit(rd, cd)
+			})
+			if streamErr == nil && strings.TrimSpace(tb.String()) != "" {
+				return tb.String(), rb.String(), fmt.Sprintf("AI 服务 · %s", p.Name), false, nil
+			}
+			if streamErr != nil && emitted {
+				return tb.String(), rb.String(), "", false, streamErr
+			}
+		}
+	}
+	t, s, nr := a.generateAnswer(ctx, question, history, providers)
+	emit("", t)
+	return t, "", s, nr, nil
 }
 
 // generateAnswer 非知识库回答管线：大模型服务（按优先级）→ 联网检索 → 本地兜底。
@@ -1845,6 +2021,7 @@ func countAnswersTodayUnlocked(items map[int64]*app.Conversation, owner int64) i
 	}
 	return count
 }
+
 // shanghaiLoc 额度统计使用的业务时区。优先加载 IANA 时区数据；
 // 运行镜像缺 tzdata 时 LoadLocation 会返回 nil Location，
 // 直接 t.In(nil) 会 panic（曾导致 AI 问答接口 500），故兜底为固定 +8 时区。

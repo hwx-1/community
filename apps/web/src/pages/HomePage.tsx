@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
+import { useEffect, useRef } from 'react'
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { NavLink } from 'react-router-dom'
 import Icon from '../components/Icon'
 import PostCard from '../components/PostCard'
@@ -6,12 +7,46 @@ import { api, formatTime } from '../api/client'
 import { useAuth } from '../store/auth'
 import styles from './HomePage.module.css'
 
+const PAGE_SIZE = 15
+
 export default function HomePage() {
   const { account } = useAuth()
-  const { data, isLoading } = useQuery({ queryKey: ['posts'], queryFn: () => api.listPosts() })
+  const {
+    data,
+    isLoading,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+  } = useInfiniteQuery({
+    queryKey: ['posts'],
+    queryFn: ({ pageParam }) => api.listPosts({ limit: PAGE_SIZE, offset: pageParam }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      if (!lastPage.has_more) return undefined
+      return allPages.reduce((n, page) => n + page.items.length, 0)
+    },
+  })
   const { data: announcements } = useQuery({ queryKey: ['announcements'], queryFn: api.listAnnouncements })
   const { data: settings } = useQuery({ queryKey: ['public-settings'], queryFn: api.publicSettings })
-  const posts = data?.items ?? []
+
+  const posts = data?.pages.flatMap((page) => page.items) ?? []
+  const announcementItems = announcements?.items ?? []
+
+  const sentinelRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage()
+        }
+      },
+      { rootMargin: '200px' },
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
   const greeting = () => {
     const hour = new Date().getHours()
@@ -34,8 +69,8 @@ export default function HomePage() {
 
       <section className={styles.mobileInfo} aria-label="校园信息">
         <details>
-          <summary><span><Icon name="bell" />平台公告</span><small>{announcements?.items.length ?? 0} 条</small></summary>
-          {(announcements?.items ?? []).slice(0, 3).map((item) => (
+          <summary><span><Icon name="bell" />平台公告</span><small>{announcementItems.length} 条</small></summary>
+          {announcementItems.slice(0, 3).map((item) => (
             <NavLink key={item.id} to={`/announcements/${item.id}`}><p>{item.title}</p><span>{formatTime(item.created_at)}</span></NavLink>
           ))}
         </details>
@@ -62,7 +97,9 @@ export default function HomePage() {
       </div>
       {!isLoading && posts.length === 0 && <div className={styles.end}>还没有帖子，来发第一条吧</div>}
 
-      {posts.length > 0 && <div className={styles.end}>已经看到这里了</div>}
+      <div ref={sentinelRef} className={styles.end}>
+        {isFetchingNextPage ? '正在加载更多…' : hasNextPage ? '继续下滑加载更多' : posts.length > 0 ? '已经看到这里了' : ''}
+      </div>
     </>
   )
 }

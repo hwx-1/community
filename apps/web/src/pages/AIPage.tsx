@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import Icon from '../components/Icon'
 import { Avatar } from '../components/Avatar'
-import { api, AIConversation, ApiError } from '../api/client'
+import { api, AIConversation, AIMessage, ApiError } from '../api/client'
 import { formatAIAnswer } from '../utils/formatAI'
 import { useAuth } from '../store/auth'
 import { useToast } from '../components/Toast'
@@ -18,22 +18,24 @@ export default function AIPage() {
   const [conversationId, setConversationId] = useState<number | null>(null)
   const [model, setModel] = useState('')
   const [input, setInput] = useState('')
-  const [thinking, setThinking] = useState(false)
+  const [streaming, setStreaming] = useState<{ reasoning: string; text: string } | null>(null)
+  const [liveMessages, setLiveMessages] = useState<AIMessage[] | null>(null)
   const [feedbackPending, setFeedbackPending] = useState<number | null>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
   const toast = useToast()
 
   const { data: models } = useQuery({ queryKey: ['ai-models'], queryFn: api.aiModels })
   const { data, refetch } = useQuery({ queryKey: ['ai-conversations'], queryFn: api.aiConversations })
-  const conversations = data?.items ?? []
+  const conversations = [...(data?.items ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at))
   const remaining = data?.remaining ?? 10
   const current: AIConversation | undefined = conversations.find((item) => item.id === conversationId) ?? conversations[0]
   const activeModel = model || current?.model || models?.items[0]?.model || 'campus-demo'
+  const messages = liveMessages ?? (current?.messages ?? [])
 
   const ask = async (question: string) => {
-    if (!question.trim() || thinking || remaining <= 0) return
-    setThinking(true)
+    if (!question.trim() || streaming || remaining <= 0) return
     setInput('')
+    const text = question.trim()
     try {
       let id = current?.id
       if (!id) {
@@ -41,12 +43,38 @@ export default function AIPage() {
         id = conversation.id
         setConversationId(id)
       }
-      await api.askAI(id, question.trim(), activeModel)
-      await refetch()
+      const optimisticUser: AIMessage = {
+        id: -Date.now(),
+        role: 'user',
+        text,
+        created_at: new Date().toISOString(),
+      }
+      setLiveMessages((prev) => [...(prev ?? current?.messages ?? []), optimisticUser])
+      setStreaming({ reasoning: '', text: '' })
+      await api.askAIStream(id, text, activeModel, (event) => {
+        if (event.type === 'thinking') {
+          setStreaming((s) => (s ? { ...s, reasoning: s.reasoning + (event.delta ?? '') } : s))
+        } else if (event.type === 'text') {
+          setStreaming((s) => (s ? { ...s, text: s.text + (event.delta ?? '') } : s))
+        } else if (event.type === 'done') {
+          const user = event.user_message ?? optimisticUser
+          const answer = event.answer ?? {
+            id: -Date.now() - 1,
+            role: 'assistant' as const,
+            text: '',
+            created_at: new Date().toISOString(),
+          }
+          setLiveMessages((prev) => [...(prev ?? []).filter((m) => m.id > 0), user, answer])
+          setStreaming(null)
+          void refetch()
+        } else if (event.type === 'error') {
+          toast(event.message ?? '回答中断，本次不扣额度', 'error')
+          setStreaming(null)
+        }
+      })
     } catch (err) {
       toast(err instanceof ApiError ? err.message : '问答服务异常，请稍后重试', 'error')
-    } finally {
-      setThinking(false)
+      setStreaming(null)
     }
   }
 
@@ -55,6 +83,7 @@ export default function AIPage() {
     setFeedbackPending(messageId)
     try {
       await api.aiFeedback(current.id, messageId, satisfied)
+      setLiveMessages(null)
       await refetch()
     } catch (err) {
       toast(err instanceof ApiError ? err.message : '反馈提交失败，请稍后重试', 'error')
@@ -66,7 +95,21 @@ export default function AIPage() {
   const removeConversation = async (id: number) => {
     await api.deleteAIConversation(id)
     if (conversationId === id) setConversationId(null)
+    if (current?.id === id) setLiveMessages(null)
     await queryClient.invalidateQueries({ queryKey: ['ai-conversations'] })
+  }
+
+  const openConversation = (id: number) => {
+    setConversationId(id)
+    setLiveMessages(null)
+    setStreaming(null)
+    setHistoryOpen(false)
+  }
+
+  const newConversation = () => {
+    setConversationId(null)
+    setLiveMessages(null)
+    setStreaming(null)
   }
 
   const submit = (event: FormEvent) => { event.preventDefault(); void ask(input) }
@@ -76,7 +119,7 @@ export default function AIPage() {
       <header className={styles.toolHead}>
         <button type="button" onClick={() => navigate('/tools')} aria-label="返回百宝箱"><Icon name="arrowLeft" /></button>
         <div><span>AI CAMPUS ASSISTANT</span><h1>AI 问答</h1></div>
-        <div className={styles.aiHeadActions}><button type="button" aria-label="会话历史" aria-expanded={historyOpen} onClick={() => setHistoryOpen(!historyOpen)}><Icon name="message" /></button><button type="button" aria-label="新建会话" onClick={() => setConversationId(null)}><Icon name="plus" /></button></div>
+        <div className={styles.aiHeadActions}><button type="button" aria-label="会话历史" aria-expanded={historyOpen} onClick={() => setHistoryOpen(!historyOpen)}><Icon name="message" /></button><button type="button" aria-label="新建会话" onClick={newConversation}><Icon name="plus" /></button></div>
       </header>
 
       <div className={styles.aiToolbar}>
@@ -93,7 +136,7 @@ export default function AIPage() {
           <div><strong>会话历史</strong><small>仅你本人可见，未主动删除会持续保留</small></div>
           {conversations.length ? conversations.map((item) => (
             <div className={styles.historyItem} key={item.id}>
-              <button type="button" onClick={() => { setConversationId(item.id); setHistoryOpen(false) }}>{item.title}</button>
+              <button type="button" onClick={() => openConversation(item.id)}>{item.title}</button>
               <button type="button" aria-label={`删除会话：${item.title}`} onClick={() => removeConversation(item.id)}><Icon name="trash" /></button>
             </div>
           )) : <p>暂无历史会话</p>}
@@ -101,7 +144,7 @@ export default function AIPage() {
       )}
 
       <div className={styles.aiMessages} aria-live="polite">
-        {(!current || current.messages.length === 0) && (
+        {(!current || messages.length === 0) && !streaming && (
           <div className={styles.aiWelcome}>
             <span><Icon name="sparkles" /></span>
             <h2>有什么可以帮你？</h2>
@@ -109,10 +152,16 @@ export default function AIPage() {
             <div>{suggestions.map((item) => <button key={item} type="button" onClick={() => void ask(item)}>{item}<Icon name="chevronRight" /></button>)}</div>
           </div>
         )}
-        {(current?.messages ?? []).map((message) => (
+        {messages.map((message) => (
           <div key={message.id} className={message.role === 'user' ? styles.aiUser : styles.aiAnswer}>
             <span>{message.role === 'user' ? <Avatar value={account?.avatar} fallback={account?.nickname.slice(0, 1) || '我'} /> : <Icon name="sparkles" />}</span>
             <div>
+              {message.role === 'assistant' && message.reasoning ? (
+                <details className={styles.aiReasoning}>
+                  <summary>思考过程</summary>
+                  <p>{message.reasoning}</p>
+                </details>
+              ) : null}
               <p>{message.role === 'assistant' ? formatAIAnswer(message.text) : message.text}</p>
               {message.model && <footer><span>由 {message.model} 回答</span>{message.source && <button type="button"><Icon name="file" />{message.source}</button>}</footer>}
               {message.needs_feedback && (
@@ -128,13 +177,30 @@ export default function AIPage() {
             </div>
           </div>
         ))}
-        {thinking && <div className={styles.aiAnswer}><span><Icon name="sparkles" /></span><div className={styles.thinking}><i /><i /><i /><small>正在查找校内资料…</small></div></div>}
+        {streaming && (
+          <div className={styles.aiAnswer}>
+            <span><Icon name="sparkles" /></span>
+            <div>
+              {streaming.reasoning ? (
+                <details className={styles.aiReasoning}>
+                  <summary>思考过程</summary>
+                  <p>{streaming.reasoning}</p>
+                </details>
+              ) : null}
+              {streaming.text ? (
+                <p>{formatAIAnswer(streaming.text)}</p>
+              ) : (
+                <div className={styles.thinking}><i /><i /><i /><small>正在思考…</small></div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <form className={styles.aiComposer} onSubmit={submit}>
         <label className="srOnly" htmlFor="ai-question">向校园助手提问</label>
         <textarea id="ai-question" rows={2} value={input} onChange={(event) => setInput(event.target.value)} placeholder={remaining > 0 ? '继续提问…' : '今日额度已用完，明日 00:00 刷新'} disabled={remaining <= 0} />
-        <div><span>AI 回答可能有误，重要信息请核对原始来源</span><button type="submit" disabled={!input.trim() || thinking || remaining <= 0}><Icon name="send" />发送</button></div>
+        <div><span>AI 回答可能有误，重要信息请核对原始来源</span><button type="submit" disabled={!input.trim() || !!streaming || remaining <= 0}><Icon name="send" />发送</button></div>
       </form>
     </section>
   )
