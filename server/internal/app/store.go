@@ -186,8 +186,8 @@ func (s *Store) public(id int64) PublicAccount {
 		return PublicAccount{}
 	}
 	out := PublicAccount{ID: a.ID, Nickname: a.Nickname, Avatar: a.Avatar, Gender: a.Gender, Verified: a.Verified, Badge: a.Badge}
-	// 历史认证账号未写入 Badge 时，按学院认证（蓝）兜底，保证显示效果一致。
-	if a.Verified && out.Badge == "" {
+	// 历史认证账号未写入 Badge、或旧版写入 org 时，统一按学院认证（蓝）兜底。
+	if a.Verified && (out.Badge == "" || out.Badge == "org") {
 		out.Badge = "college"
 	}
 	return out
@@ -625,6 +625,7 @@ func (s *Store) loadSnapshot() (bool, error) {
 	s.Settings, s.PostLikes, s.PostBookmarks = snap.Settings, snap.PostLikes, snap.PostBookmarks
 	s.Notifications, s.Punishments, s.Appeals = snap.Notifications, snap.Punishments, snap.Appeals
 	s.ensureMaps()
+	s.normalizeBadges()
 	for id, value := range snap.AccountPasswordHashes {
 		if s.Accounts[id] != nil {
 			s.Accounts[id].PasswordHash = value
@@ -718,6 +719,26 @@ func (s *Store) ensureMaps() {
 	}
 	if s.Appeals == nil {
 		s.Appeals = map[int64]*Appeal{}
+	}
+}
+
+// normalizeBadges 把旧版徽标值归一化：旧数据里 PublicAccount.Badge 可能为 "org"，
+// 账号也可能只有 Verified=true 而无 Badge，统一折算为学院认证（蓝）。
+func (s *Store) normalizeBadges() {
+	for _, a := range s.Accounts {
+		if a.Verified && (a.Badge == "" || a.Badge == "org") {
+			a.Badge = "college"
+		}
+	}
+	for _, p := range s.Posts {
+		if p.Author.Verified && (p.Author.Badge == "" || p.Author.Badge == "org") {
+			p.Author.Badge = "college"
+		}
+	}
+	for _, cm := range s.Comments {
+		if cm.Author.Verified && (cm.Author.Badge == "" || cm.Author.Badge == "org") {
+			cm.Author.Badge = "college"
+		}
 	}
 }
 
