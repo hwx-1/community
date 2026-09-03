@@ -47,6 +47,9 @@ type PublicAccount struct {
 	Avatar   string `json:"avatar"`
 	Gender   string `json:"gender"`
 	Verified bool   `json:"verified"`
+	// Badge 徽标类型：official=官方(红) org=认证账号(蓝) admin=管理员发布(绿)。
+	// 当前仅按认证状态派生 org；后续接入官方号/机构号时扩展来源。
+	Badge string `json:"badge,omitempty"`
 }
 
 type Post struct {

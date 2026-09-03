@@ -95,6 +95,7 @@ func (a *API) deleteAccount(c *gin.Context) {
 				p.Author.Nickname = "已注销用户"
 				p.Author.Avatar = ""
 				p.Author.Verified = false
+				p.Author.Badge = ""
 			}
 		}
 		for _, cm := range a.store.Comments {
@@ -102,6 +103,7 @@ func (a *API) deleteAccount(c *gin.Context) {
 				cm.Author.Nickname = "已注销用户"
 				cm.Author.Avatar = ""
 				cm.Author.Verified = false
+				cm.Author.Badge = ""
 			}
 		}
 		// 认证记录匿名化（保留审核事实，删除身份资料）

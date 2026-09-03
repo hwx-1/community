@@ -185,7 +185,12 @@ func (s *Store) public(id int64) PublicAccount {
 	if a == nil {
 		return PublicAccount{}
 	}
-	return PublicAccount{ID: a.ID, Nickname: a.Nickname, Avatar: a.Avatar, Gender: a.Gender, Verified: a.Verified}
+	out := PublicAccount{ID: a.ID, Nickname: a.Nickname, Avatar: a.Avatar, Gender: a.Gender, Verified: a.Verified}
+	// 与客户端契约对齐：认证账号展示蓝 V（org），客户端对空值也按 org 兜底，显示效果一致。
+	if a.Verified {
+		out.Badge = "org"
+	}
+	return out
 }
 func (s *Store) NextID() int64                        { return s.next() }
 func (s *Store) PublicAccount(id int64) PublicAccount { return s.public(id) }

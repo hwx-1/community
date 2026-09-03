@@ -391,8 +391,8 @@ func (a *API) updateProfile(c *gin.Context) {
 		fail(c, 422, "NICKNAME_INVALID", "昵称需为 2–16 个字符")
 		return
 	}
-	if in.Gender != "男" && in.Gender != "女" {
-		fail(c, 422, "GENDER_INVALID", "性别仅支持男或女")
+	if in.Gender != "男" && in.Gender != "女" && in.Gender != "保密" {
+		fail(c, 422, "GENDER_INVALID", "性别仅支持男、女或保密")
 		return
 	}
 	a.store.MuLock(func() {
