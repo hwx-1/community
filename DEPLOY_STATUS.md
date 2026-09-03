@@ -26,8 +26,19 @@
 
 - 部署**不再走** 服务器 `git pull`，代码由流水线制品下发，`/opt/xsnbb/.git` 的 remote 配置已不参与部署
 - 服务器上的 `infra/.env`（生产配置）不在仓库中，rsync 已排除，部署不会影响它
-- 数据库与上传文件使用 Docker 命名卷（pgdata / xsnbb-data / xsnbb-uploads），不受部署影响
+- **实际运行的 compose 是 `/home/admin/app/docker-compose.yml`**（项目名 `app`，镜像来自阿里云 ACR `crpi-*.cn-beijing.personal.cr.aliyuncs.com/xsnbb/infra-xsnbb`），数据库卷为 `app_db_data`；仓库内 `infra/docker-compose.prod.yml`（项目名 `infra`，卷 `infra_pgdata`）当前**未运行**
+- 数据库与上传文件使用 Docker 命名卷，不受部署影响
 - 流水线部署任务超时已设为 3600 秒，暂停方式为「不暂停」
+
+### 数据卷迁移记录（2026-09-03）
+
+9-02 切换到 `/home/admin/app` 新 compose 时数据库挂到了全新空卷 `app_db_data`，导致 9-02 之前注册的账号（13900000000、13158268668）与帖子数据不可见。已于 2026-09-03 完成迁移：
+
+1. 停 `xsnbb` 应用容器，备份新卷快照至 `/opt/backups/snapshot-app_db_data-before-migrate-20260903-111835.json`
+2. 用临时容器挂载旧卷 `infra_pgdata`（postgres:17-alpine，旧数据为 17 格式）导出 `db_store_snapshots` 快照
+3. 用 jq 将快照中 `admin_password_hashes.admin` 替换为 `Admin12345` 的 argon2id 哈希（旧卷中 9-02 重置的密码已不可考）
+4. 写回新卷数据库并重启，验证：2 账号、1 帖子恢复，超管 `admin`/`Admin12345` 登录正常
+5. 旧卷 `infra_pgdata` 与 `/opt/backups` 中的备份保留，确认线上稳定运行一段时间后可删除
 
 ## 二、服务器信息
 
@@ -100,7 +111,7 @@ df -h && free -h
 | 服务 | 地址 | 说明 |
 |-----|------|------|
 | 社区首页 | https://xsnbb.xyz | 注册/手机号登录 |
-| 管理后台 | https://xsnbb.xyz/admin/ | admin，密码已于 2026-09-02 通过独立安全流程重置（API/界面均不支持超管改密：生成 argon2id 哈希 → 停服 → 替换 db_store_snapshots 快照中 admin_password_hashes.admin → 重启）。`.env` 的 SUPER_ADMIN_PASSWORD 仅在无任何超管的全新初始化时生效 |
+| 管理后台 | https://xsnbb.xyz/admin/ | admin / Admin12345（2026-09-03 数据卷迁移时重置，登录后请立即改为强密码：超管改密需走独立安全流程——生成 argon2id 哈希 → 停服 → 替换 db_store_snapshots 快照中 admin_password_hashes.admin → 重启）。`.env` 的 SUPER_ADMIN_PASSWORD 仅在无任何超管的全新初始化时生效 |
 | Portainer | http://39.106.198.88:9000 | Docker 可视化管理 |
 
 ## 七、凭据与密钥位置
