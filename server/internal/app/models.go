@@ -36,9 +36,12 @@ type Account struct {
 	ClassName    string     `json:"class_name,omitempty"`
 	ProfileDone  bool       `json:"profile_done"`
 	Verified     bool       `json:"verified"`
-	Status       string     `json:"status"` // active / muted / banned / deactivated
-	MutedUntil   *time.Time `json:"muted_until,omitempty"`
-	CreatedAt    time.Time  `json:"created_at"`
+	// Badge 认证徽标类型：admin=管理员认证(红) college=学院认证(蓝) institution=机构认证(墨绿)。
+	// 认证通过时由审核结果写入，未认证为空。
+	Badge       string     `json:"badge,omitempty"`
+	Status      string     `json:"status"` // active / muted / banned / deactivated
+	MutedUntil  *time.Time `json:"muted_until,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
 }
 
 type PublicAccount struct {
@@ -47,8 +50,7 @@ type PublicAccount struct {
 	Avatar   string `json:"avatar"`
 	Gender   string `json:"gender"`
 	Verified bool   `json:"verified"`
-	// Badge 徽标类型：official=官方(红) org=认证账号(蓝) admin=管理员发布(绿)。
-	// 当前仅按认证状态派生 org；后续接入官方号/机构号时扩展来源。
+	// Badge 认证徽标类型：admin=管理员认证(红) college=学院认证(蓝) institution=机构认证(墨绿)。
 	Badge string `json:"badge,omitempty"`
 }
 
@@ -88,6 +90,8 @@ type Verification struct {
 	RealName     string    `json:"real_name"`
 	StudentNo    string    `json:"student_no"`
 	MaterialURL  string    `json:"material_url"`
+	// Type 认证类型：admin=管理员认证 college=学院认证 institution=机构认证；空值按 college 兼容历史数据。
+	Type         string    `json:"type"`
 	Status       string    `json:"status"`
 	RejectReason string    `json:"reject_reason,omitempty"`
 	CreatedAt    time.Time `json:"created_at"`

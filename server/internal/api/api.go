@@ -416,15 +416,24 @@ func (a *API) submitVerification(c *gin.Context) {
 		MaterialURL string `json:"material_url"`
 		RealName    string `json:"real_name"`
 		StudentNo   string `json:"student_no"`
+		Type        string `json:"type"`
 	}
 	if c.ShouldBindJSON(&in) != nil || in.MaterialURL == "" {
 		fail(c, 422, "MATERIAL_REQUIRED", "请上传一张证明材料")
 		return
 	}
+	// 空值兼容历史提交（学生认证），默认学院认证。
+	if in.Type == "" {
+		in.Type = "college"
+	}
+	if in.Type != "admin" && in.Type != "college" && in.Type != "institution" {
+		fail(c, 422, "TYPE_INVALID", "认证类型无效")
+		return
+	}
 	var v *app.Verification
 	a.store.MuLock(func() {
 		id := a.store.NextID()
-		v = &app.Verification{ID: id, AccountID: account.ID, Nickname: account.Nickname, RealName: in.RealName, StudentNo: in.StudentNo, MaterialURL: in.MaterialURL, Status: "pending", CreatedAt: time.Now()}
+		v = &app.Verification{ID: id, AccountID: account.ID, Nickname: account.Nickname, RealName: in.RealName, StudentNo: in.StudentNo, MaterialURL: in.MaterialURL, Type: in.Type, Status: "pending", CreatedAt: time.Now()}
 		a.store.Verifications[id] = v
 	})
 	c.JSON(201, gin.H{"verification": v})
@@ -1563,6 +1572,11 @@ func (a *API) reviewVerification(c *gin.Context) {
 				account.Verified = true
 				account.RealName = v.RealName
 				account.StudentNo = v.StudentNo
+				// 历史申请未记录类型时按学院认证兜底。
+				account.Badge = v.Type
+				if account.Badge == "" {
+					account.Badge = "college"
+				}
 			}
 		}
 		a.store.AddAuditUnlocked(admin, "verification.review", fmt.Sprintf("verification:%d", id), in.Status, in.Reason, "security")

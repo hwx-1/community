@@ -141,9 +141,9 @@ func NewStore(cfg *config.Config) *Store {
 	s.AdminRoles[3] = &AdminRole{ID: 3, Name: "内容与举报审核", Permissions: []string{"post.moderate", "comment.moderate", "report.review", "appeal.review"}, CreatedAt: now, UpdatedAt: now}
 	s.Admins[cfg.SuperAdminUser] = &AdminAccount{ID: 1, Username: cfg.SuperAdminUser, PasswordHash: adminHash, IsSuper: true, RoleIDs: []int64{1}, Enabled: true, CreatedAt: now, UpdatedAt: now}
 	if cfg.Env != "prod" && len(s.Accounts) == 0 {
-		s.Accounts[1] = &Account{ID: 1, Phone: "13800000000", PasswordHash: demoHash, Nickname: "李大壮", Avatar: "李", Gender: "男", RealName: "李同学", StudentNo: "2023000042", ClassName: "计算机 2301 班", ProfileDone: true, Verified: true, Status: "active", CreatedAt: now.AddDate(0, 0, -23)}
-		s.Accounts[2] = &Account{ID: 2, Phone: "13800000001", PasswordHash: demoHash, Nickname: "王小雨", Avatar: "王", Gender: "女", ProfileDone: true, Verified: true, Status: "active", CreatedAt: now.AddDate(0, 0, -18)}
-		s.Accounts[3] = &Account{ID: 3, Phone: "13800000002", PasswordHash: demoHash, Nickname: "张同学", Avatar: "张", Gender: "男", ProfileDone: true, Verified: true, Status: "active", CreatedAt: now.AddDate(0, 0, -12)}
+		s.Accounts[1] = &Account{ID: 1, Phone: "13800000000", PasswordHash: demoHash, Nickname: "李大壮", Avatar: "李", Gender: "男", RealName: "李同学", StudentNo: "2023000042", ClassName: "计算机 2301 班", ProfileDone: true, Verified: true, Badge: "college", Status: "active", CreatedAt: now.AddDate(0, 0, -23)}
+		s.Accounts[2] = &Account{ID: 2, Phone: "13800000001", PasswordHash: demoHash, Nickname: "王小雨", Avatar: "王", Gender: "女", ProfileDone: true, Verified: true, Badge: "college", Status: "active", CreatedAt: now.AddDate(0, 0, -18)}
+		s.Accounts[3] = &Account{ID: 3, Phone: "13800000002", PasswordHash: demoHash, Nickname: "张同学", Avatar: "张", Gender: "男", ProfileDone: true, Verified: true, Badge: "college", Status: "active", CreatedAt: now.AddDate(0, 0, -12)}
 	}
 	for id, account := range s.Accounts {
 		s.Phones[account.Phone] = id
@@ -154,7 +154,7 @@ func NewStore(cfg *config.Config) *Store {
 		s.Posts[3] = &Post{ID: 3, Author: s.public(2), Text: "高数期末复习重点整理完了，需要的同学可以自取。", Tags: []string{"学习资料", "期末复习"}, Status: "public", Likes: 21, Comments: 1, Bookmarks: 9, CreatedAt: now.Add(-time.Hour), UpdatedAt: now.Add(-time.Hour)}
 		s.Comments[1] = &Comment{ID: 1, PostID: 2, Author: s.public(2), Text: "算我一个！", Status: "public", CreatedAt: now.Add(-18 * time.Minute)}
 		s.Comments[2] = &Comment{ID: 2, PostID: 2, Author: s.public(3), Text: "新手可以参加吗？", Status: "public", CreatedAt: now.Add(-8 * time.Minute)}
-		s.Verifications[1] = &Verification{ID: 1, AccountID: 3, Nickname: "张同学", RealName: "张同学", StudentNo: "2023000066", MaterialURL: "/private/verifications/demo.jpg", Status: "pending", CreatedAt: now.Add(-8 * 24 * time.Hour)}
+		s.Verifications[1] = &Verification{ID: 1, AccountID: 3, Nickname: "张同学", RealName: "张同学", StudentNo: "2023000066", MaterialURL: "/private/verifications/demo.jpg", Type: "college", Status: "pending", CreatedAt: now.Add(-8 * 24 * time.Hour)}
 		s.DirectConversations[1] = &DirectConversation{ID: 1, MemberIDs: []int64{1, 3}, GreetingBy: map[int64]bool{3: true}, Messages: []DirectMessage{{ID: 1, SenderID: 3, Text: "我想和你聊聊", System: true, Status: "delivered", CreatedAt: now.Add(-10 * time.Minute)}}, UpdatedAt: now.Add(-10 * time.Minute)}
 		s.PendingQuestions[1] = &PendingQuestion{ID: 1, AccountID: 2, Question: "游泳馆几点关门？", Status: "open", AskCount: 3, CreatedAt: now.Add(-30 * time.Hour)}
 	}
@@ -185,10 +185,10 @@ func (s *Store) public(id int64) PublicAccount {
 	if a == nil {
 		return PublicAccount{}
 	}
-	out := PublicAccount{ID: a.ID, Nickname: a.Nickname, Avatar: a.Avatar, Gender: a.Gender, Verified: a.Verified}
-	// 与客户端契约对齐：认证账号展示蓝 V（org），客户端对空值也按 org 兜底，显示效果一致。
-	if a.Verified {
-		out.Badge = "org"
+	out := PublicAccount{ID: a.ID, Nickname: a.Nickname, Avatar: a.Avatar, Gender: a.Gender, Verified: a.Verified, Badge: a.Badge}
+	// 历史认证账号未写入 Badge 时，按学院认证（蓝）兜底，保证显示效果一致。
+	if a.Verified && out.Badge == "" {
+		out.Badge = "college"
 	}
 	return out
 }

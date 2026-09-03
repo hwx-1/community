@@ -88,6 +88,7 @@ func (a *API) deleteAccount(c *gin.Context) {
 		account.ClassName = ""
 		account.ProfileDone = false
 		account.Verified = false
+		account.Badge = ""
 		account.MutedUntil = nil
 		// 已发内容匿名化但保留
 		for _, p := range a.store.Posts {
