@@ -130,6 +130,7 @@ func (a *API) myBookmarks(c *gin.Context) {
 	account := current(c)
 	a.store.MuRLock(func() {
 		posts := a.store.BookmarksOfLocked(account.ID)
+		thumbPostImages(posts)
 		a.store.DecoratePosts(posts, account.ID)
 		c.JSON(http.StatusOK, gin.H{"items": posts})
 	})

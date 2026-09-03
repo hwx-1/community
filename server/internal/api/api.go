@@ -428,6 +428,43 @@ func (a *API) submitVerification(c *gin.Context) {
 	c.JSON(201, gin.H{"verification": v})
 }
 
+// postThumbWidth 信息流/列表缩略图宽度：列表用小图，详情仍返回原图。
+const postThumbWidth = 400
+
+// thumbPostImages 给列表/信息流返回的帖子图片附加 OSS 缩略图参数，
+// 把首屏图片从原图（可能数 MB）降到几十 KB；详情接口不调用，保持原图。
+func thumbPostImages(posts []app.Post) {
+	for i := range posts {
+		posts[i].Images = thumbImages(posts[i].Images)
+	}
+}
+
+func thumbImages(images []string) []string {
+	if len(images) == 0 {
+		return images
+	}
+	out := make([]string, len(images))
+	for i, u := range images {
+		out[i] = thumbImage(u)
+	}
+	return out
+}
+
+func thumbImage(u string) string {
+	if u == "" {
+		return u
+	}
+	// 仅对 OSS/CDN 的 http(s) 图片加缩略图参数；本地 /uploads 相对路径与其它值跳过。
+	if !strings.HasPrefix(u, "http://") && !strings.HasPrefix(u, "https://") {
+		return u
+	}
+	sep := "?"
+	if strings.Contains(u, "?") {
+		sep = "&"
+	}
+	return u + sep + "x-oss-process=image/resize,w_" + strconv.Itoa(postThumbWidth)
+}
+
 func (a *API) listPosts(c *gin.Context) {
 	account := current(c)
 	var mine *int64
@@ -437,6 +474,7 @@ func (a *API) listPosts(c *gin.Context) {
 	}
 	a.store.MuRLock(func() {
 		posts := a.store.ListPostsUnlocked(c.Query("q"), mine)
+		thumbPostImages(posts)
 		a.store.DecoratePosts(posts, account.ID)
 		c.JSON(200, gin.H{"items": posts})
 	})
@@ -681,6 +719,7 @@ func (a *API) publicUser(c *gin.Context) {
 				posts = append(posts, p)
 			}
 		}
+		thumbPostImages(posts)
 		a.store.DecoratePosts(posts, viewer.ID)
 		c.JSON(200, gin.H{"user": a.store.PublicAccount(account.ID), "posts": posts})
 	})
