@@ -21,14 +21,17 @@
 .uploadHead div { display: flex; flex-direction: column; }
 .uploadHead strong { font-size: 14px; }
 .uploadHead span, .uploadHead small { color: var(--text-soft); font-size: 11px; }
-.upload { width: 100%; height: 76px; margin-top: 12px; display: flex; align-items: center; justify-content: center; gap: 8px; border: 1.5px dashed var(--border); border-radius: var(--r-md); background: var(--surface-subtle); color: var(--text-muted); }
-.upload:hover { border-color: var(--brand); color: var(--brand); background: var(--brand-soft); }
-.upload svg { width: 18px; }
-.imageList { margin-top: 10px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.imageList button { min-width: 0; height: 34px; padding: 0 10px; display: grid; grid-template-columns: 14px 1fr 12px; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); color: var(--text-muted); }
-.imageList button:hover { border-color: var(--brand); color: var(--brand); }
-.imageList button span { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
-.imageList button svg { width: 12px; }
+/* 已上传图片：固定尺寸方形缩略图 + 右上角移除按钮 */
+.imageList { margin-top: 12px; display: grid; grid-template-columns: repeat(auto-fill, 96px); gap: 10px; }
+.imageItem { position: relative; width: 96px; height: 96px; }
+.imageItem img { width: 96px; height: 96px; object-fit: cover; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-subtle); }
+.imageItem button { position: absolute; top: -6px; right: -6px; width: 22px; height: 22px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 50%; background: rgba(18, 18, 18, .72); color: #fff; box-shadow: var(--shadow-sm); }
+.imageItem button:hover { background: var(--danger); }
+.imageItem button svg { width: 11px; height: 11px; }
+.uploadTile { width: 96px; height: 96px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; border: 1.5px dashed var(--border); border-radius: var(--r-sm); background: var(--surface-subtle); color: var(--text-muted); font-size: 11px; }
+.uploadTile:hover:not(:disabled) { border-color: var(--brand); color: var(--brand); background: var(--brand-soft); }
+.uploadTile:disabled { cursor: wait; opacity: .6; }
+.uploadTile svg { width: 18px; height: 18px; }
 
 .tagInput { height: 44px; padding: 0 6px 0 14px; display: flex; align-items: center; gap: 4px; border: 1px solid transparent; border-radius: var(--r-pill); background: var(--surface-subtle); }
 .tagInput > span { color: var(--brand); }
@@ -64,7 +67,6 @@
   .form { padding: 18px 16px; }
   .card textarea { min-height: 150px; }
   .uploadHead small { display: none; }
-  .imageList { grid-template-columns: 1fr 1fr; }
   .actions { flex-direction: column; align-items: stretch; }
   .actionButtons { justify-content: flex-end; }
 }

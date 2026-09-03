@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import Icon from '../components/Icon'
 import { api, ApiError } from '../api/client'
 import { useAuth } from '../store/auth'
+import { useToast } from '../components/Toast'
 import styles from './AuthPage.module.css'
 
 type AuthMode = 'login' | 'register' | 'forgot'
@@ -23,8 +24,8 @@ export default function AuthPage({ mode }: { mode: AuthMode }) {
   const [devCode, setDevCode] = useState('')
   const [accepted, setAccepted] = useState(mode !== 'register')
   const [finished, setFinished] = useState(false)
-  const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const toast = useToast()
   const navigate = useNavigate()
   const location = useLocation()
   const { setAccount } = useAuth()
@@ -32,17 +33,16 @@ export default function AuthPage({ mode }: { mode: AuthMode }) {
 
   const sendCode = async () => {
     if (phone.length !== 11) {
-      setError('请先填写 11 位手机号')
+      toast('请先填写 11 位手机号', 'error')
       return
     }
-    setError('')
     try {
       const result = await api.smsCode(phone, mode === 'forgot' ? 'reset' : 'register')
       setSent(true)
       // 开发模式：验证码直接展示，正式环境不会返回 dev_code
       if (result.dev_code) setDevCode(result.dev_code)
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : '验证码发送失败')
+      toast(err instanceof ApiError ? err.message : '验证码发送失败', 'error')
     }
   }
 
@@ -50,7 +50,6 @@ export default function AuthPage({ mode }: { mode: AuthMode }) {
     event.preventDefault()
     if (!accepted || busy) return
     setBusy(true)
-    setError('')
     try {
       if (mode === 'login') {
         const { account } = await api.login(phone, password)
@@ -66,7 +65,7 @@ export default function AuthPage({ mode }: { mode: AuthMode }) {
         setFinished(true)
       }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : '操作失败，请稍后重试')
+      toast(err instanceof ApiError ? err.message : '操作失败，请稍后重试', 'error')
     } finally {
       setBusy(false)
     }
@@ -131,7 +130,6 @@ export default function AuthPage({ mode }: { mode: AuthMode }) {
 
           {mode === 'login' && <div className={styles.formMeta}><span /> <Link to="/forgot-password">忘记密码？</Link></div>}
 
-          {error && <p role="alert" className={styles.errorBox}>{error}</p>}
           <button className={styles.submit} type="submit" disabled={!accepted || busy}>{busy ? '处理中…' : content.submit}</button>
           <footer>
             {mode === 'login' && <>还没有账号？<Link to="/register">使用邀请码注册</Link></>}

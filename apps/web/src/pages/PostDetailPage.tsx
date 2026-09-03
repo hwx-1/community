@@ -6,6 +6,7 @@ import PostCard from '../components/PostCard'
 import { Avatar } from '../components/Avatar'
 import { api, CommentItem, formatTime } from '../api/client'
 import { useAuth } from '../store/auth'
+import { useToast } from '../components/Toast'
 import styles from './PostDetailPage.module.css'
 
 // 知乎式举报原因分类
@@ -23,7 +24,7 @@ export default function PostDetailPage() {
   const [content, setContent] = useState('')
   const [replyTo, setReplyTo] = useState<CommentItem | null>(null)
   const [reportTarget, setReportTarget] = useState<ReportTarget | null>(params.get('report') === '1' ? { kind: 'post', id: Number(postId) } : null)
-  const [notice, setNotice] = useState('')
+  const toast = useToast()
   const composerRef = useRef<HTMLTextAreaElement>(null)
 
   const { data, isLoading, isError } = useQuery({ queryKey: ['post', id], queryFn: () => api.getPost(id), enabled: Number.isFinite(id), retry: false })
@@ -49,18 +50,17 @@ export default function PostDetailPage() {
     onSuccess: ({ message }) => {
       setContent('')
       setReplyTo(null)
-      setNotice(message)
+      toast(message, 'success')
       void refetchComments()
       void queryClient.invalidateQueries({ queryKey: ['post', id] })
     },
-    onError: (err) => setNotice(err instanceof Error ? err.message : '评论失败'),
+    onError: (err) => toast(err instanceof Error ? err.message : '评论失败', 'error'),
   })
 
   // 点击评论（或“回复”按钮）唤起回复：聚焦输入框并带上回复目标
   const startReply = (comment: CommentItem) => {
     if (comment.deleted) return
     setReplyTo(comment)
-    setNotice('')
     requestAnimationFrame(() => {
       composerRef.current?.focus()
       composerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -101,7 +101,6 @@ export default function PostDetailPage() {
             <span>{content.length} / 500</span>
             <button type="submit" disabled={!content.trim() || commentMutation.isPending}>{replyTo ? '发表回复' : '发表评论'}</button>
           </div>
-          {notice && <p role="status" style={{ color: 'var(--text-muted)' }}>{notice}</p>}
         </form>
       </section>
 
@@ -175,7 +174,7 @@ function ReportDialog({ target, onClose }: { target: ReportTarget; onClose: () =
   const [detail, setDetail] = useState('')
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(false)
-  const [error, setError] = useState('')
+  const toast = useToast()
 
   useEffect(() => {
     const onKey = (event: globalThis.KeyboardEvent) => { if (event.key === 'Escape') onClose() }
@@ -186,14 +185,13 @@ function ReportDialog({ target, onClose }: { target: ReportTarget; onClose: () =
   const submit = async () => {
     if (busy) return
     setBusy(true)
-    setError('')
     try {
       const fullReason = detail.trim() ? `${reason}：${detail.trim()}` : reason
       if (target.kind === 'post') await api.reportPost(target.id, fullReason)
       else await api.reportComment(target.id, fullReason)
       setDone(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : '举报失败，请稍后重试')
+      toast(err instanceof Error ? err.message : '举报失败，请稍后重试', 'error')
     } finally {
       setBusy(false)
     }
@@ -225,7 +223,6 @@ function ReportDialog({ target, onClose }: { target: ReportTarget; onClose: () =
                 ))}
               </div>
               <textarea maxLength={200} value={detail} onChange={(event) => setDetail(event.target.value)} placeholder="补充说明（选填，200 字以内）" />
-              {error && <p role="alert" className={styles.reportError}>{error}</p>}
             </div>
             <footer className={styles.reportFoot}>
               <button type="button" onClick={onClose}>取消</button>

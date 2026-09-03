@@ -6,6 +6,7 @@ import { Avatar } from '../components/Avatar'
 import { api, AIConversation, ApiError } from '../api/client'
 import { formatAIAnswer } from '../utils/formatAI'
 import { useAuth } from '../store/auth'
+import { useToast } from '../components/Toast'
 import styles from './ToolDetailPage.module.css'
 
 const suggestions = ['教务处电话是多少？', '图书馆今天几点闭馆？', '游泳馆几点关门？']
@@ -20,7 +21,7 @@ export default function AIPage() {
   const [thinking, setThinking] = useState(false)
   const [feedbackPending, setFeedbackPending] = useState<number | null>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
-  const [error, setError] = useState('')
+  const toast = useToast()
 
   const { data: models } = useQuery({ queryKey: ['ai-models'], queryFn: api.aiModels })
   const { data, refetch } = useQuery({ queryKey: ['ai-conversations'], queryFn: api.aiConversations })
@@ -31,7 +32,6 @@ export default function AIPage() {
 
   const ask = async (question: string) => {
     if (!question.trim() || thinking || remaining <= 0) return
-    setError('')
     setThinking(true)
     setInput('')
     try {
@@ -44,7 +44,7 @@ export default function AIPage() {
       await api.askAI(id, question.trim(), activeModel)
       await refetch()
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : '问答服务异常，请稍后重试')
+      toast(err instanceof ApiError ? err.message : '问答服务异常，请稍后重试', 'error')
     } finally {
       setThinking(false)
     }
@@ -52,13 +52,12 @@ export default function AIPage() {
 
   const sendFeedback = async (messageId: number, satisfied: boolean) => {
     if (!current || feedbackPending !== null) return
-    setError('')
     setFeedbackPending(messageId)
     try {
       await api.aiFeedback(current.id, messageId, satisfied)
       await refetch()
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : '反馈提交失败，请稍后重试')
+      toast(err instanceof ApiError ? err.message : '反馈提交失败，请稍后重试', 'error')
     } finally {
       setFeedbackPending(null)
     }
@@ -130,7 +129,6 @@ export default function AIPage() {
           </div>
         ))}
         {thinking && <div className={styles.aiAnswer}><span><Icon name="sparkles" /></span><div className={styles.thinking}><i /><i /><i /><small>正在查找校内资料…</small></div></div>}
-        {error && <p role="alert" style={{ color: 'var(--danger)' }}>{error}</p>}
       </div>
 
       <form className={styles.aiComposer} onSubmit={submit}>

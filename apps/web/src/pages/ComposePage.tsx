@@ -2,17 +2,18 @@ import { FormEvent, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import Icon from '../components/Icon'
 import { api, ApiError } from '../api/client'
+import { useToast } from '../components/Toast'
 import styles from './ComposePage.module.css'
 
 export default function ComposePage() {
   const { postId } = useParams()
   const isEditing = Boolean(postId)
+  const toast = useToast()
   const [content, setContent] = useState('')
   const [tags, setTags] = useState<string[]>([])
   const [imageUrls, setImageUrls] = useState<string[]>([])
   const [uploading, setUploading] = useState(false)
   const [submitted, setSubmitted] = useState('')
-  const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const tagRef = useRef<HTMLInputElement>(null)
   const imageRef = useRef<HTMLInputElement>(null)
@@ -25,8 +26,8 @@ export default function ComposePage() {
       setContent(post.text)
       setTags(post.tags ?? [])
       setImageUrls(post.images ?? [])
-    }).catch(() => setError('帖子不存在或已删除'))
-  }, [postId])
+    }).catch(() => toast('帖子不存在或已删除', 'error'))
+  }, [postId, toast])
 
   const addTag = () => {
     const value = tagRef.current?.value.trim()
@@ -38,7 +39,6 @@ export default function ComposePage() {
   const pickImages = async (files: FileList | null) => {
     if (!files?.length) return
     setUploading(true)
-    setError('')
     try {
       const remaining = 9 - imageUrls.length
       for (const file of Array.from(files).slice(0, remaining)) {
@@ -46,7 +46,7 @@ export default function ComposePage() {
         setImageUrls((current) => [...current, url])
       }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : '图片上传失败')
+      toast(err instanceof ApiError ? err.message : '图片上传失败', 'error')
     } finally {
       setUploading(false)
       if (imageRef.current) imageRef.current.value = ''
@@ -57,7 +57,6 @@ export default function ComposePage() {
     event.preventDefault()
     if (!content.trim() || busy) return
     setBusy(true)
-    setError('')
     try {
       const payload = { text: content.trim(), images: imageUrls, tags }
       const result = isEditing
@@ -65,7 +64,7 @@ export default function ComposePage() {
         : await api.createPost(payload)
       setSubmitted(result.message)
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : '提交失败，请稍后重试')
+      toast(err instanceof ApiError ? err.message : '提交失败，请稍后重试', 'error')
     } finally {
       setBusy(false)
     }
@@ -87,15 +86,25 @@ export default function ComposePage() {
         <div className={styles.divider} />
         <div className={styles.uploadHead}><div><strong>添加图片</strong><span>选填，最多 9 张</span></div><small>JPG / PNG / WEBP / HEIC，单张不超过 5MB</small></div>
         <input className="srOnly" ref={imageRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic" multiple onChange={(event) => pickImages(event.target.files)} />
-        <button className={styles.upload} type="button" disabled={uploading} onClick={() => imageRef.current?.click()}><Icon name="image" /><span>{uploading ? '上传中…' : imageUrls.length ? `已上传 ${imageUrls.length} 张图片` : '选择图片'}</span></button>
-        {imageUrls.length > 0 && <div className={styles.imageList}>{imageUrls.map((url) => <button key={url} type="button" onClick={() => setImageUrls(imageUrls.filter((item) => item !== url))}><Icon name="image" /><span>{url.split('/').pop()}</span><Icon name="close" /></button>)}</div>}
+        <div className={styles.imageList}>
+          {imageUrls.map((url) => (
+            <div key={url} className={styles.imageItem}>
+              <img src={url} alt="已上传的图片" loading="lazy" />
+              <button type="button" aria-label="移除这张图片" onClick={() => setImageUrls(imageUrls.filter((item) => item !== url))}><Icon name="close" /></button>
+            </div>
+          ))}
+          {(uploading || imageUrls.length < 9) && (
+            <button className={styles.uploadTile} type="button" disabled={uploading} onClick={() => imageRef.current?.click()}>
+              <Icon name="image" /><span>{uploading ? '上传中…' : '添加图片'}</span>
+            </button>
+          )}
+        </div>
       </section>
       <section className={styles.card}>
         <label htmlFor="post-tag">帖子标签 <span>选填，最多 3 个</span></label>
         <div className={styles.tagInput}><span>#</span><input id="post-tag" ref={tagRef} maxLength={10} placeholder="输入标签名称" onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addTag() } }} /><button type="button" onClick={addTag}>添加</button></div>
         <div className={styles.tags}>{tags.map((tag) => <button key={tag} type="button" onClick={() => setTags(tags.filter((item) => item !== tag))}># {tag}<Icon name="close" /></button>)}</div>
       </section>
-      {error && <p role="alert" style={{ color: 'var(--danger)' }}>{error}</p>}
       <div className={styles.actions}>
         <div className={styles.notice}><Icon name="shield" /><span>帖子提交后将经过内容审核，通过后公开展示。</span></div>
         <div className={styles.actionButtons}>

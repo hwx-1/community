@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import Icon, { IconName } from '../components/Icon'
 import { useNavigate } from 'react-router-dom'
-import { api } from '../api/client'
+import { api, Tool } from '../api/client'
 import styles from './ToolsPage.module.css'
 
 const toolPaths: Record<string, string> = { ai: '/tools/ai', map: '/tools/map', links: '/tools/links' }
@@ -9,6 +9,17 @@ const toolDescs: Record<string, { desc: string; note: string }> = {
   ai: { desc: '查询校内资讯与部门电话', note: '每日 10 次免费额度' },
   map: { desc: '快速查找教学楼与场馆', note: '点击查看大图' },
   links: { desc: '教务、图书馆等常用入口', note: '后台统一维护' },
+}
+
+// 外链工具（http/https）在新标签页打开，站内工具走路由跳转
+export const isExternalTool = (tool: Tool) => /^https?:\/\//i.test(tool.url ?? '')
+
+export function openTool(tool: Tool, navigate: (to: string) => void) {
+  if (isExternalTool(tool)) {
+    window.open(tool.url, '_blank', 'noopener,noreferrer')
+  } else {
+    navigate(tool.url || toolPaths[tool.type] || '/tools')
+  }
 }
 
 export default function ToolsPage() {
@@ -24,12 +35,13 @@ export default function ToolsPage() {
 
       <section className={styles.grid} aria-label="百宝箱工具">
         {tools.map((tool, index) => {
-          const meta = toolDescs[tool.type] ?? { desc: tool.url || '由管理员配置', note: '点击前往' }
+          const external = isExternalTool(tool)
+          const meta = toolDescs[tool.type] ?? { desc: '由管理员配置', note: external ? '在新标签页打开' : '点击前往' }
           return (
-            <button key={tool.id} className={index === 0 ? `${styles.card} ${styles.featured}` : styles.card} type="button" onClick={() => navigate(tool.url || toolPaths[tool.type] || '/tools')}>
+            <button key={tool.id} className={index === 0 ? `${styles.card} ${styles.featured}` : styles.card} type="button" onClick={() => openTool(tool, navigate)}>
               <span className={styles.icon}><Icon name={(tool.icon || 'toolbox') as IconName} /></span>
               <span className={styles.content}><strong>{tool.name}</strong><span>{meta.desc}</span><small>{meta.note}</small></span>
-              <Icon name="chevronRight" className={styles.arrow} />
+              <Icon name={external ? 'external' : 'chevronRight'} className={styles.arrow} />
             </button>
           )
         })}

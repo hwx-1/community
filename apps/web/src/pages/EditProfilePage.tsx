@@ -4,17 +4,17 @@ import Icon from '../components/Icon'
 import { Avatar } from '../components/Avatar'
 import { api, ApiError } from '../api/client'
 import { useAuth } from '../store/auth'
+import { useToast } from '../components/Toast'
 import styles from './AccountPage.module.css'
 
 export default function EditProfilePage() {
   const navigate = useNavigate()
   const { account, setAccount } = useAuth()
+  const toast = useToast()
   const [nickname, setNickname] = useState(account?.nickname ?? '')
   const [gender, setGender] = useState(account?.gender ?? '男')
   const [className, setClassName] = useState(account?.class_name ?? '')
   const [avatar, setAvatar] = useState(account?.avatar ?? '')
-  const [saved, setSaved] = useState(false)
-  const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -24,7 +24,7 @@ export default function EditProfilePage() {
       const { url } = await api.upload(file)
       setAvatar(url)
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : '头像上传失败')
+      toast(err instanceof ApiError ? err.message : '头像上传失败', 'error')
     }
   }
 
@@ -32,8 +32,6 @@ export default function EditProfilePage() {
     event.preventDefault()
     if (busy) return
     setBusy(true)
-    setError('')
-    setSaved(false)
     try {
       const { account: updated } = await api.updateProfile({
         nickname,
@@ -44,9 +42,9 @@ export default function EditProfilePage() {
         class_name: className,
       })
       setAccount(updated)
-      setSaved(true)
+      toast('资料已保存', 'success')
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : '保存失败，请稍后重试')
+      toast(err instanceof ApiError ? err.message : '保存失败，请稍后重试', 'error')
     } finally {
       setBusy(false)
     }
@@ -55,7 +53,6 @@ export default function EditProfilePage() {
   return (
     <form className={styles.accountPage} onSubmit={submit}>
       <header className={styles.pageHead}><button type="button" onClick={() => navigate('/me')}><Icon name="arrowLeft" /></button><div><h1>编辑资料</h1><p>公开资料与内部认证资料分开管理。</p></div></header>
-      {saved && <div className={styles.successNotice}><Icon name="check" />资料已保存</div>}
       <section className={styles.formCard}>
         <h2>公开资料</h2>
         <div className={styles.avatarEditor}>
@@ -79,7 +76,6 @@ export default function EditProfilePage() {
         <input id="student-id" value={account?.student_no ?? ''} disabled />
         <button className={styles.secondaryButton} type="button" onClick={() => navigate('/me/verification')}>申请变更认证资料</button>
       </section>
-      {error && <p role="alert" style={{ color: 'var(--danger)' }}>{error}</p>}
       <button className={styles.primaryButton} type="submit" disabled={busy}>{busy ? '保存中…' : '保存修改'}</button>
     </form>
   )

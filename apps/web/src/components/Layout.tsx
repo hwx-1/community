@@ -1,10 +1,11 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import Icon, { IconName } from './Icon'
 import { Avatar } from './Avatar'
 import { api, formatTime } from '../api/client'
 import { useAuth } from '../store/auth'
+import { isExternalTool } from '../pages/ToolsPage'
 import styles from './Layout.module.css'
 
 type Theme = 'light' | 'dark'
@@ -31,6 +32,14 @@ export default function Layout() {
   const location = useLocation()
   const queryClient = useQueryClient()
   const { account, loaded, refresh } = useAuth()
+  const colsRef = useRef<HTMLDivElement>(null)
+  const mainRef = useRef<HTMLElement>(null)
+
+  // 三栏各自持有滚动条：切换路由时把栏内滚动位置复位到顶部
+  useEffect(() => {
+    colsRef.current?.scrollTo({ top: 0 })
+    mainRef.current?.scrollTo({ top: 0 })
+  }, [location.pathname])
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -130,7 +139,7 @@ export default function Layout() {
         </div>
       </header>
 
-      <div className={styles.cols}>
+      <div className={styles.cols} ref={colsRef}>
         <aside className={styles.left} aria-label="主导航">
           <ProfileCard />
           <NavList unread={unreadTotal} />
@@ -141,7 +150,7 @@ export default function Layout() {
           <p className={styles.communityNote}>学生共建社区 · 非学校官方平台</p>
         </aside>
 
-        <main className={styles.main} id="main-content">
+        <main className={styles.main} id="main-content" ref={mainRef}>
           <Outlet />
         </main>
 
@@ -245,13 +254,20 @@ function RightSidebar() {
           <h2>百宝箱</h2>
           <NavLink to="/tools">查看全部</NavLink>
         </div>
-        {(tools?.items ?? []).slice(0, 3).map((tool) => (
-          <NavLink key={tool.id} to={tool.url || toolPaths[tool.type] || '/tools'} className={styles.toolRow}>
-            <span className={styles.toolIcon}><Icon name={(tool.icon || 'toolbox') as IconName} /></span>
-            <span><strong>{tool.name}</strong><small>{tool.type === 'ai' ? '查部门电话与官方资讯' : tool.type === 'map' ? '快速找到教学楼' : '教务、图书馆'}</small></span>
-            <Icon name="chevronRight" />
-          </NavLink>
-        ))}
+        {(tools?.items ?? []).slice(0, 3).map((tool) => {
+          const external = isExternalTool(tool)
+          const desc = tool.type === 'ai' ? '查部门电话与官方资讯' : tool.type === 'map' ? '快速找到教学楼' : tool.type === 'links' ? '教务、图书馆' : '由管理员配置'
+          const body = (
+            <>
+              <span className={styles.toolIcon}><Icon name={(tool.icon || 'toolbox') as IconName} /></span>
+              <span><strong>{tool.name}</strong><small>{desc}</small></span>
+              <Icon name={external ? 'external' : 'chevronRight'} />
+            </>
+          )
+          return external
+            ? <a key={tool.id} href={tool.url} target="_blank" rel="noopener noreferrer" className={styles.toolRow}>{body}</a>
+            : <NavLink key={tool.id} to={tool.url || toolPaths[tool.type] || '/tools'} className={styles.toolRow}>{body}</NavLink>
+        })}
       </section>
 
       <section className={styles.panel}>

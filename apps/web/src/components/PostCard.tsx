@@ -5,6 +5,7 @@ import { Avatar } from './Avatar'
 import { isImageUrl } from '../utils/image'
 import { api, formatTime, Post } from '../api/client'
 import { useAuth } from '../store/auth'
+import { useToast } from './Toast'
 import styles from './PostCard.module.css'
 
 const statusLabels: Record<string, string> = {
@@ -23,7 +24,7 @@ export default function PostCard({ post, onChanged, variant = 'feed' }: { post: 
   const [preview, setPreview] = useState<string | null>(null)
   const [broken, setBroken] = useState<Record<string, boolean>>({})
   const [menuOpen, setMenuOpen] = useState(false)
-  const [error, setError] = useState('')
+  const toast = useToast()
   const navigate = useNavigate()
   const { account } = useAuth()
   const mine = account?.id === post.author.id
@@ -42,7 +43,7 @@ export default function PostCard({ post, onChanged, variant = 'feed' }: { post: 
       setLikes(updated.likes)
       onChanged?.(updated)
     } catch (err) {
-      setError(err instanceof Error ? err.message : '操作失败')
+      toast(err instanceof Error ? err.message : '操作失败', 'error')
     }
   }
 
@@ -52,7 +53,7 @@ export default function PostCard({ post, onChanged, variant = 'feed' }: { post: 
       setSaved(updated.bookmarked)
       onChanged?.(updated)
     } catch (err) {
-      setError(err instanceof Error ? err.message : '操作失败')
+      toast(err instanceof Error ? err.message : '操作失败', 'error')
     }
   }
 
@@ -124,8 +125,6 @@ export default function PostCard({ post, onChanged, variant = 'feed' }: { post: 
 
         {tagList}
 
-        {error && <p role="alert" style={{ color: 'var(--danger)', margin: '4px 0' }}>{error}</p>}
-
         <footer className={styles.actionBar}>
           <button type="button" className={liked ? styles.actionOn : ''} aria-label={`${liked ? '取消点赞' : '点赞'}，当前 ${likes} 个赞`} aria-pressed={liked} onClick={toggleLike}>
             <Icon name="heart" /> <span>{likes}</span>
@@ -174,8 +173,6 @@ export default function PostCard({ post, onChanged, variant = 'feed' }: { post: 
       )}
 
       {tagList}
-
-      {error && <p role="alert" style={{ color: 'var(--danger)', margin: '4px 0' }}>{error}</p>}
 
       <footer className={styles.streamBar}>
         <button type="button" className={liked ? `${styles.vote} ${styles.voteOn}` : styles.vote} aria-label={`${liked ? '取消点赞' : '点赞'}，当前 ${likes} 个赞`} aria-pressed={liked} onClick={toggleLike}>

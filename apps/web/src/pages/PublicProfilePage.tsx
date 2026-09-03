@@ -6,6 +6,7 @@ import PostCard from '../components/PostCard'
 import { Avatar } from '../components/Avatar'
 import { api, ApiError } from '../api/client'
 import { useAuth } from '../store/auth'
+import { useToast } from '../components/Toast'
 import styles from './AccountPage.module.css'
 
 export default function PublicProfilePage() {
@@ -14,9 +15,8 @@ export default function PublicProfilePage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { account } = useAuth()
+  const toast = useToast()
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['public-profile', id],
@@ -30,13 +30,12 @@ export default function PublicProfilePage() {
   const startChat = async () => {
     if (!user || busy) return
     setBusy(true)
-    setError('')
     try {
       const { item } = await api.startDirectConversation(user.id)
       void queryClient.invalidateQueries({ queryKey: ['direct-conversations', account?.id] })
       navigate(`/messages/${item.id}`)
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : '发起私信失败，请稍后重试')
+      toast(err instanceof ApiError ? err.message : '发起私信失败，请稍后重试', 'error')
       setBusy(false)
     }
   }
@@ -46,13 +45,11 @@ export default function PublicProfilePage() {
     const reason = window.prompt('请填写举报原因（必填）')
     if (!reason || !reason.trim()) return
     setBusy(true)
-    setError('')
-    setNotice('')
     try {
       const result = await api.reportUser(user.id, reason.trim())
-      setNotice(result.message || '举报已提交，管理员会尽快处理')
+      toast(result.message || '举报已提交，管理员会尽快处理', 'success')
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : '举报提交失败，请稍后重试')
+      toast(err instanceof ApiError ? err.message : '举报提交失败，请稍后重试', 'error')
     } finally {
       setBusy(false)
     }
@@ -90,9 +87,6 @@ export default function PublicProfilePage() {
               </div>
             )}
           </section>
-
-          {error && <p role="alert" style={{ color: 'var(--danger)', margin: '4px 2px', fontSize: 11 }}>{error}</p>}
-          {notice && <p role="status" className={styles.inlineSuccess}><Icon name="check" />{notice}</p>}
 
           <div className={styles.publicTitle}><h2>TA 的帖子</h2><span>{userPosts.length} 篇</span></div>
           {userPosts.length

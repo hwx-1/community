@@ -5,6 +5,7 @@ import Icon from '../components/Icon'
 import { Avatar } from '../components/Avatar'
 import { api, ApiError, DirectConversationResponse, DirectConversationsResponse, formatTime } from '../api/client'
 import { useAuth } from '../store/auth'
+import { useToast } from '../components/Toast'
 import styles from './ChatPage.module.css'
 
 export default function ChatPage() {
@@ -15,7 +16,7 @@ export default function ChatPage() {
   const { account } = useAuth()
   const [text, setText] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
-  const [error, setError] = useState('')
+  const toast = useToast()
   const [busy, setBusy] = useState(false)
   const messagesRef = useRef<HTMLDivElement>(null)
   const nearBottomRef = useRef(true)
@@ -85,7 +86,6 @@ export default function ChatPage() {
   const send = async (content: string, system: boolean) => {
     if (busy) return
     setBusy(true)
-    setError('')
     try {
       const result = await api.sendDirectMessage(id, content, system)
       queryClient.setQueryData<DirectConversationResponse>(detailKey, (current) => {
@@ -113,7 +113,7 @@ export default function ChatPage() {
       void queryClient.invalidateQueries({ queryKey: listKey })
       setText('')
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : '发送失败，请稍后重试')
+      toast(err instanceof ApiError ? err.message : '发送失败，请稍后重试', 'error')
     } finally {
       setBusy(false)
     }
@@ -171,8 +171,6 @@ export default function ChatPage() {
           )
         })}
       </div>
-
-      {error && <p role="alert" style={{ color: 'var(--danger)', padding: '0 16px' }}>{error}</p>}
 
       {!unlocked ? (
         <div className={styles.handshake}>

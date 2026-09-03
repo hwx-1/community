@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import Icon from '../components/Icon'
 import { api, ApiError, MyVerification } from '../api/client'
+import { useToast } from '../components/Toast'
 import styles from './AccountPage.module.css'
 
 // 学号脱敏：保留前 4 位和后 2 位，如 2023****42
@@ -20,6 +21,7 @@ function maskName(name: string): string {
 export default function VerificationPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const toast = useToast()
   const { data, isLoading } = useQuery({ queryKey: ['my-verification'], queryFn: api.myVerification })
   const verification = data?.verification ?? null
 
@@ -30,23 +32,21 @@ export default function VerificationPage() {
   const [materialUrl, setMaterialUrl] = useState('')
   const [uploading, setUploading] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
   const [submitted, setSubmitted] = useState(false)
 
   const uploadProof = async (file: File | undefined) => {
     if (!file) return
     if (file.size > 5 * 1024 * 1024) {
-      setError('材料图片不能超过 5MB')
+      toast('材料图片不能超过 5MB', 'error')
       return
     }
     setUploading(true)
-    setError('')
     try {
       const { url } = await api.upload(file)
       setMaterialUrl(url)
       setFileName(file.name)
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : '材料上传失败')
+      toast(err instanceof ApiError ? err.message : '材料上传失败', 'error')
     } finally {
       setUploading(false)
     }
@@ -56,18 +56,17 @@ export default function VerificationPage() {
     event.preventDefault()
     if (busy || uploading) return
     if (!materialUrl) {
-      setError('请先上传证明材料')
+      toast('请先上传证明材料', 'error')
       return
     }
     setBusy(true)
-    setError('')
     try {
       await api.submitVerification({ material_url: materialUrl, real_name: realName.trim(), student_no: studentNo.trim() })
       setSubmitted(true)
       setEditing(false)
       void queryClient.invalidateQueries({ queryKey: ['my-verification'] })
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : '提交失败，请稍后重试')
+      toast(err instanceof ApiError ? err.message : '提交失败，请稍后重试', 'error')
     } finally {
       setBusy(false)
     }
@@ -116,7 +115,6 @@ export default function VerificationPage() {
           <label className={styles.uploadBox} htmlFor="proof-file"><Icon name="image" /><strong>{uploading ? '上传中…' : fileName || '选择学生证或学信网截图'}</strong><small>需包含姓名、学号与学校信息；jpg / png / webp / heic，单张不超过 5MB</small></label>
           <input className="srOnly" id="proof-file" type="file" accept="image/jpeg,image/png,image/webp,image/heic" onChange={(event) => void uploadProof(event.target.files?.[0])} required={!materialUrl} />
           <div className={styles.privacyBox}><Icon name="shield" /><p><strong>材料仅用于身份核验</strong><span>仅获授权审核员在处理申请时可见，审核结束 30 天后自动删除。</span></p></div>
-          {error && <p role="alert" style={{ color: 'var(--danger)', margin: '8px 0 0' }}>{error}</p>}
           <button className={styles.primaryButton} type="submit" disabled={busy || uploading}>{busy ? '提交中…' : '提交人工审核'}</button>
         </form>
       )}
