@@ -12,7 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const maxUploadSize = 5 << 20 // 单张 ≤ 5MB
+const maxUploadSize = 10 << 20 // 单张 ≤ 10MB
 
 var allowedImageTypes = map[string]string{
 	"image/jpeg": ".jpg",
@@ -31,7 +31,7 @@ func (a *API) upload(c *gin.Context) {
 	}
 	defer file.Close()
 	if header.Size > maxUploadSize {
-		fail(c, 422, "FILE_TOO_LARGE", "单张图片不能超过 5MB")
+		fail(c, 422, "FILE_TOO_LARGE", "单张图片不能超过 10MB")
 		return
 	}
 	ext, ok := allowedImageTypes[header.Header.Get("Content-Type")]
@@ -54,7 +54,7 @@ func (a *API) upload(c *gin.Context) {
 	}
 	data, err := io.ReadAll(io.LimitReader(file, maxUploadSize+1))
 	if err != nil || len(data) > maxUploadSize {
-		fail(c, 422, "FILE_TOO_LARGE", "单张图片不能超过 5MB")
+		fail(c, 422, "FILE_TOO_LARGE", "单张图片不能超过 10MB")
 		return
 	}
 	buf := make([]byte, 8)

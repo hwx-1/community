@@ -83,7 +83,7 @@ export default function Announcements() {
       return Upload.LIST_IGNORE
     }
     if (file.size > 5 * 1024 * 1024) {
-      message.error('图片大小不能超过 5MB')
+      message.error('图片大小不能超过 10MB')
       return Upload.LIST_IGNORE
     }
     setUploading(true)
@@ -210,7 +210,7 @@ export default function Announcements() {
           >
             <Input.TextArea rows={6} />
           </Form.Item>
-          <Form.Item name="image_url" label="公告配图" extra="支持 JPG、PNG、WebP、HEIC，单张不超过 5MB。">
+          <Form.Item name="image_url" label="公告配图" extra="支持 JPG、PNG、WebP、HEIC，单张不超过 10MB。">
             <Input type="hidden" />
           </Form.Item>
           <div className="announcement-image-editor">

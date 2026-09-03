@@ -57,7 +57,7 @@ export default function EditProfilePage() {
         <h2>公开资料</h2>
         <div className={styles.avatarEditor}>
           <span><Avatar value={avatar} fallback={nickname.slice(0, 1)} /></span>
-          <div><strong>头像</strong><small>JPG / PNG / WEBP / HEIC，最大 5MB</small><button type="button" onClick={() => fileRef.current?.click()}>更换头像</button></div>
+          <div><strong>头像</strong><small>JPG / PNG / WEBP / HEIC，最大 10MB</small><button type="button" onClick={() => fileRef.current?.click()}>更换头像</button></div>
           <input className="srOnly" ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic" onChange={(event) => uploadAvatar(event.target.files?.[0])} />
         </div>
         <label htmlFor="nickname">公开昵称 <span>全站唯一，2–16 字符</span></label>

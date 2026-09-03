@@ -37,7 +37,7 @@ export default function VerificationPage() {
   const uploadProof = async (file: File | undefined) => {
     if (!file) return
     if (file.size > 5 * 1024 * 1024) {
-      toast('材料图片不能超过 5MB', 'error')
+      toast('材料图片不能超过 10MB', 'error')
       return
     }
     setUploading(true)
@@ -112,7 +112,7 @@ export default function VerificationPage() {
           <label htmlFor="verify-student-id">学号 <span>必填</span></label>
           <input id="verify-student-id" value={studentNo} onChange={(event) => setStudentNo(event.target.value)} placeholder="与证明材料一致" required />
           <label htmlFor="proof-file">证明材料 <span>每次仅 1 张</span></label>
-          <label className={styles.uploadBox} htmlFor="proof-file"><Icon name="image" /><strong>{uploading ? '上传中…' : fileName || '选择学生证或学信网截图'}</strong><small>需包含姓名、学号与学校信息；jpg / png / webp / heic，单张不超过 5MB</small></label>
+          <label className={styles.uploadBox} htmlFor="proof-file"><Icon name="image" /><strong>{uploading ? '上传中…' : fileName || '选择学生证或学信网截图'}</strong><small>需包含姓名、学号与学校信息；jpg / png / webp / heic，单张不超过 10MB</small></label>
           <input className="srOnly" id="proof-file" type="file" accept="image/jpeg,image/png,image/webp,image/heic" onChange={(event) => void uploadProof(event.target.files?.[0])} required={!materialUrl} />
           <div className={styles.privacyBox}><Icon name="shield" /><p><strong>材料仅用于身份核验</strong><span>仅获授权审核员在处理申请时可见，审核结束 30 天后自动删除。</span></p></div>
           <button className={styles.primaryButton} type="submit" disabled={busy || uploading}>{busy ? '提交中…' : '提交人工审核'}</button>

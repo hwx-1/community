@@ -84,7 +84,7 @@ export default function ComposePage() {
         <textarea id="post-content" maxLength={2000} value={content} onChange={(event) => setContent(event.target.value)} placeholder="想和大家分享什么？" />
         <div className={styles.count}>{content.length} / 2000</div>
         <div className={styles.divider} />
-        <div className={styles.uploadHead}><div><strong>添加图片</strong><span>选填，最多 9 张</span></div><small>JPG / PNG / WEBP / HEIC，单张不超过 5MB</small></div>
+        <div className={styles.uploadHead}><div><strong>添加图片</strong><span>选填，最多 9 张</span></div><small>JPG / PNG / WEBP / HEIC，单张不超过 10MB</small></div>
         <input className="srOnly" ref={imageRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic" multiple onChange={(event) => pickImages(event.target.files)} />
         <div className={styles.imageList}>
           {imageUrls.map((url) => (

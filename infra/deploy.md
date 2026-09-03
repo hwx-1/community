@@ -62,7 +62,7 @@ server {
     listen 443 ssl;
     server_name xsnbb.xyz www.xsnbb.xyz;
     # certbot --nginx 自动填充证书路径
-    client_max_body_size 6m;   # 单图 ≤5MB
+    client_max_body_size 12m;   # 单图 ≤10MB
     location / {
         proxy_pass http://127.0.0.1:8080;
         proxy_set_header Host $host;
