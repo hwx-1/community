@@ -2,7 +2,8 @@ import { FormEvent, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import Icon from '../components/Icon'
-import { api, ApiError, MyVerification } from '../api/client'
+import { VerifiedBadge } from '../components/VerifiedBadge'
+import { api, ApiError, MyVerification, VerificationType } from '../api/client'
 import { useToast } from '../components/Toast'
 import styles from './AccountPage.module.css'
 
@@ -18,6 +19,12 @@ function maskName(name: string): string {
   return `${name.slice(0, 1)}${'*'.repeat(Math.min(name.length - 1, 2))}`
 }
 
+const TYPE_OPTIONS: { value: VerificationType; label: string; desc: string }[] = [
+  { value: 'admin', label: '管理员认证', desc: '社区官方管理员' },
+  { value: 'college', label: '学院认证', desc: '学生 / 学院成员' },
+  { value: 'institution', label: '机构认证', desc: '机构 / 组织账号' },
+]
+
 export default function VerificationPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -26,6 +33,7 @@ export default function VerificationPage() {
   const verification = data?.verification ?? null
 
   const [editing, setEditing] = useState(false)
+  const [type, setType] = useState<VerificationType>('college')
   const [realName, setRealName] = useState('')
   const [studentNo, setStudentNo] = useState('')
   const [fileName, setFileName] = useState('')
@@ -61,7 +69,12 @@ export default function VerificationPage() {
     }
     setBusy(true)
     try {
-      await api.submitVerification({ material_url: materialUrl, real_name: realName.trim(), student_no: studentNo.trim() })
+      await api.submitVerification({
+        material_url: materialUrl,
+        real_name: realName.trim(),
+        student_no: type === 'college' ? studentNo.trim() : '',
+        type,
+      })
       setSubmitted(true)
       setEditing(false)
       void queryClient.invalidateQueries({ queryKey: ['my-verification'] })
@@ -80,7 +93,7 @@ export default function VerificationPage() {
     <div className={styles.accountPage}>
       <header className={styles.pageHead}>
         <button type="button" aria-label="返回" onClick={() => navigate('/me')}><Icon name="arrowLeft" /></button>
-        <div><h1>学生认证</h1><p>由获得授权的管理员人工审核。</p></div>
+        <div><h1>身份认证</h1><p>管理员 / 学院 / 机构三类认证，由授权管理员人工审核。</p></div>
       </header>
 
       {isLoading && <section className={styles.statusCard}><span><Icon name="clock" /></span><div><small>当前状态</small><h2>加载中…</h2></div></section>}
@@ -91,9 +104,9 @@ export default function VerificationPage() {
 
       {!isLoading && status === 'approved' && verification && (
         <>
-          <section className={`${styles.statusCard} ${styles.statusApproved}`}><span><Icon name="check" /></span><div><small>当前状态</small><h2>认证已通过</h2><p>{maskName(verification.real_name)} · {maskStudentNo(verification.student_no)}，你可以正常使用发帖、互动、私信和 AI 问答。</p></div></section>
-          <div className={styles.privacyBox}><Icon name="lock" /><p><strong>姓名与学号已锁定</strong><span>如需变更，请在下方重新提交证明材料，由管理员人工处理。</span></p></div>
-          {!editing && <button className={styles.secondaryButton} type="button" onClick={() => setEditing(true)}>申请变更姓名或学号</button>}
+          <section className={`${styles.statusCard} ${styles.statusApproved}`}><span><Icon name="check" /></span><div><small>当前状态</small><h2>认证已通过</h2><p><VerifiedBadge type={verification.type || 'college'} showLabel /> {maskName(verification.real_name)} · {maskStudentNo(verification.student_no)}，你可以正常使用发帖、互动、私信和 AI 问答。</p></div></section>
+          <div className={styles.privacyBox}><Icon name="lock" /><p><strong>姓名与学号已锁定</strong><span>如需变更认证类型或资料，请在下方重新提交证明材料，由管理员人工处理。</span></p></div>
+          {!editing && <button className={styles.secondaryButton} type="button" onClick={() => setEditing(true)}>申请变更认证</button>}
         </>
       )}
 
@@ -103,16 +116,38 @@ export default function VerificationPage() {
 
       {!isLoading && !submitted && showForm && (
         <form className={styles.formCard} onSubmit={submit}>
-          <h2>{status === 'approved' ? '提交资料变更申请' : '提交学生认证申请'}</h2>
+          <h2>{status === 'approved' ? '提交认证变更申请' : '提交认证申请'}</h2>
+
+          <label>认证类型 <span>必选</span></label>
+          <div className={styles.typeOptions}>
+            {TYPE_OPTIONS.map((opt) => (
+              <label className={styles.typeOption} key={opt.value}>
+                <input type="radio" name="verify-type" value={opt.value} checked={type === opt.value} onChange={() => setType(opt.value)} />
+                <div>
+                  <VerifiedBadge type={opt.value} />
+                  <strong>{opt.label}</strong>
+                  <small>{opt.desc}</small>
+                </div>
+              </label>
+            ))}
+          </div>
+
           {status !== 'approved' && (
             <div className={styles.privacyBox}><Icon name="info" /><p><strong>认证通过前</strong><span>你可以浏览社区和举报违规内容，暂不能发帖、评论、私信和使用 AI 问答。</span></p></div>
           )}
+
           <label htmlFor="verify-name">真实姓名 <span>必填</span></label>
-          <input id="verify-name" value={realName} onChange={(event) => setRealName(event.target.value)} placeholder="与证明材料一致" required />
-          <label htmlFor="verify-student-id">学号 <span>必填</span></label>
-          <input id="verify-student-id" value={studentNo} onChange={(event) => setStudentNo(event.target.value)} placeholder="与证明材料一致" required />
+          <input id="verify-name" value={realName} onChange={(event) => setRealName(event.target.value)} placeholder={type === 'institution' ? '机构负责人姓名或机构名称' : '与证明材料一致'} required />
+
+          {type === 'college' && (
+            <>
+              <label htmlFor="verify-student-id">学号 <span>必填</span></label>
+              <input id="verify-student-id" value={studentNo} onChange={(event) => setStudentNo(event.target.value)} placeholder="与证明材料一致" required />
+            </>
+          )}
+
           <label htmlFor="proof-file">证明材料 <span>每次仅 1 张</span></label>
-          <label className={styles.uploadBox} htmlFor="proof-file"><Icon name="image" /><strong>{uploading ? '上传中…' : fileName || '选择学生证或学信网截图'}</strong><small>需包含姓名、学号与学校信息；jpg / png / webp / heic，单张不超过 10MB</small></label>
+          <label className={styles.uploadBox} htmlFor="proof-file"><Icon name="image" /><strong>{uploading ? '上传中…' : fileName || '选择证明材料截图'}</strong><small>{type === 'college' ? '需包含姓名、学号与学校信息' : '需清晰显示对应身份或机构资质信息'}；jpg / png / webp / heic，单张不超过 10MB</small></label>
           <input className="srOnly" id="proof-file" type="file" accept="image/jpeg,image/png,image/webp,image/heic" onChange={(event) => void uploadProof(event.target.files?.[0])} required={!materialUrl} />
           <div className={styles.privacyBox}><Icon name="shield" /><p><strong>材料仅用于身份核验</strong><span>仅获授权审核员在处理申请时可见，审核结束 30 天后自动删除。</span></p></div>
           <button className={styles.primaryButton} type="submit" disabled={busy || uploading}>{busy ? '提交中…' : '提交人工审核'}</button>
@@ -123,7 +158,7 @@ export default function VerificationPage() {
         <section className={styles.submitted}><Icon name="clock" /><h2>申请已提交</h2><p>审核期间原认证信息继续有效，处理结果会发送到消息页。</p><button type="button" onClick={() => navigate('/me')}>返回我的</button></section>
       )}
 
-      <section className={styles.ruleCard}><h2>认证说明</h2><ul><li>证明材料可遮挡身份证号等无关信息。</li><li>管理员仅核对姓名、学号和学校信息，不要求学信网账号密码。</li><li>申请被驳回后可修改材料重新提交，不限制补交次数。</li></ul></section>
+      <section className={styles.ruleCard}><h2>认证说明</h2><ul><li>管理员认证为红色徽标，学院认证为蓝色徽标，机构认证为墨绿色徽标。</li><li>证明材料可遮挡身份证号等无关信息。</li><li>管理员仅核对身份与机构信息，不要求账号密码或学信网登录。</li><li>申请被驳回后可修改材料重新提交，不限制补交次数。</li></ul></section>
     </div>
   )
 }

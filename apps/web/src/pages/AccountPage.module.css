@@ -29,6 +29,15 @@
 .formCard input:disabled { color: var(--text-soft); background: var(--surface-subtle); }
 .twoCol { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 
+/* 认证类型选择 */
+.typeOptions { margin: 0 0 6px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.typeOption { position: relative; }
+.typeOption input { position: absolute; opacity: 0; pointer-events: none; }
+.typeOption > div { padding: 12px 8px; display: flex; flex-direction: column; align-items: center; gap: 4px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-subtle); cursor: pointer; text-align: center; transition: border-color .15s, background .15s; }
+.typeOption input:checked + div { border-color: var(--brand); background: var(--brand-soft); box-shadow: 0 0 0 1px var(--brand); }
+.typeOption strong { font-size: 13px; font-weight: 600; }
+.typeOption small { color: var(--text-soft); font-size: 11px; }
+
 /* 头像编辑 */
 .avatarEditor { margin-bottom: 18px; padding-bottom: 18px; display: flex; align-items: center; gap: 14px; border-bottom: 1px solid var(--border-light); }
 .avatarEditor > span { width: 64px; height: 64px; display: grid; place-items: center; overflow: hidden; border-radius: 50%; color: var(--brand-dark); background: var(--brand-soft); font-size: 20px; font-weight: 700; }

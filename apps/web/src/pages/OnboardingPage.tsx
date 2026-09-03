@@ -66,7 +66,7 @@ export default function OnboardingPage() {
     }
     setBusy(true)
     try {
-      await api.submitVerification({ material_url: proofUrl, real_name: realName, student_no: studentNo })
+      await api.submitVerification({ material_url: proofUrl, real_name: realName, student_no: studentNo, type: 'college' })
       setStep(3)
     } catch (err) {
       toast(err instanceof ApiError ? err.message : '提交失败，请稍后重试', 'error')

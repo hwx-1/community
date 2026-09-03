@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import Icon, { IconName } from '../components/Icon'
 import PostCard from '../components/PostCard'
 import { Avatar } from '../components/Avatar'
+import { VerifiedBadge } from '../components/VerifiedBadge'
 import { api, formatTime } from '../api/client'
 import { useAuth } from '../store/auth'
 import styles from './ProfilePage.module.css'
@@ -19,7 +20,7 @@ export default function ProfilePage() {
 
   const menuItems: { icon: IconName; label: string; note?: string; action: () => void }[] = [
     { icon: 'edit', label: '编辑资料', note: '头像、昵称、性别与班级', action: () => navigate('/me/edit') },
-    { icon: 'shield', label: '学生认证与资料变更', note: account?.verified ? '认证已通过' : '未认证或审核中', action: () => navigate('/me/verification') },
+    { icon: 'shield', label: '身份认证与资料变更', note: account?.verified ? '认证已通过' : '未认证或审核中', action: () => navigate('/me/verification') },
     { icon: 'settings', label: '账号设置', note: '密码、会话与注销', action: () => navigate('/me/settings') },
     { icon: 'logout', label: '退出登录', action: () => { void logout().then(() => navigate('/login', { replace: true })) } },
   ]
@@ -32,7 +33,7 @@ export default function ProfilePage() {
         <div className={styles.profileTop}>
           <div className={styles.avatar}><Avatar value={account?.avatar} fallback={account?.nickname.slice(0, 1)} /></div>
           <div className={styles.profileMain}>
-            <div className={styles.nameLine}><h1>{account?.nickname}</h1>{account?.verified && <span><Icon name="check" />沈大学生</span>}</div>
+            <div className={styles.nameLine}><h1>{account?.nickname}</h1><VerifiedBadge type={account?.badge} showLabel /></div>
             <p>{account?.gender || '未设置'} · {account?.class_name || '未设置班级'}</p>
             <small>加入社区 {joinedDays} 天</small>
           </div>

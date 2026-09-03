@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import Icon, { IconName } from './Icon'
 import { Avatar } from './Avatar'
+import { VerifiedBadge } from './VerifiedBadge'
 import { api, formatTime } from '../api/client'
 import { useAuth } from '../store/auth'
 import { isExternalTool } from '../pages/ToolsPage'
@@ -235,7 +236,7 @@ function ProfileCard() {
       <div className={styles.avatarLg}><Avatar value={account.avatar} fallback={account.nickname.slice(0, 1)} /></div>
       <div className={styles.userInfo}>
         <div className={styles.name}>{account.nickname}</div>
-        {account.verified && <span className={styles.badge}><Icon name="check" /> 沈大学生</span>}
+        <VerifiedBadge type={account.badge} showLabel />
       </div>
       <Icon name="chevronRight" className={styles.userArrow} />
     </NavLink>

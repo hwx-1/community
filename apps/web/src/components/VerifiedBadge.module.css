@@ -1,0 +1,47 @@
+/* 认证徽标：管理员认证（红）、学院认证（蓝）、机构认证（墨绿） */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.icon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
+.label {
+  font-size: 11px;
+  font-weight: 550;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.pill {
+  padding: 3px 8px;
+  border-radius: var(--r-pill);
+}
+
+.admin {
+  color: #ff2442;
+}
+.admin.pill {
+  background: var(--brand-soft);
+}
+
+.college {
+  color: #2f6fed;
+}
+.college.pill {
+  background: #eef3fe;
+}
+
+.institution {
+  color: #0f7a53;
+}
+.institution.pill {
+  background: #eaf7f0;
+}

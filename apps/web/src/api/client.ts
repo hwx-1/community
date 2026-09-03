@@ -7,6 +7,7 @@ export interface PublicAccount {
   avatar: string
   gender: string
   verified: boolean
+  badge?: string
 }
 
 export interface Account extends PublicAccount {
@@ -150,9 +151,12 @@ export interface PublicSettings {
 
 export type VerificationStatus = 'pending' | 'approved' | 'rejected'
 
+export type VerificationType = 'admin' | 'college' | 'institution'
+
 export interface MyVerification {
   id: number
   status: VerificationStatus
+  type?: VerificationType
   reject_reason?: string
   real_name: string
   student_no: string
@@ -249,7 +253,7 @@ export const api = {
   me: () => request<{ account: Account }>('GET', '/api/v1/me'),
   updateProfile: (input: { nickname: string; avatar: string; gender: string; real_name: string; student_no: string; class_name: string }) =>
     request<{ account: Account }>('PUT', '/api/v1/me/profile', input),
-  submitVerification: (input: { material_url: string; real_name: string; student_no: string }) =>
+  submitVerification: (input: { material_url: string; real_name: string; student_no: string; type: VerificationType }) =>
     request<{ verification: unknown }>('POST', '/api/v1/me/verification', input),
   myVerification: () => request<{ verification: MyVerification | null }>('GET', '/api/v1/me/verification'),
   changePassword: (currentPassword: string, newPassword: string) =>

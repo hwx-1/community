@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Icon from './Icon'
 import { Avatar } from './Avatar'
+import { VerifiedBadge } from './VerifiedBadge'
 import { isImageUrl } from '../utils/image'
 import { api, formatTime, Post } from '../api/client'
 import { useAuth } from '../store/auth'
@@ -99,7 +100,7 @@ export default function PostCard({ post, onChanged, variant = 'feed' }: { post: 
             <span className={styles.authorMeta}>
               <span className={styles.name}>
                 {post.author.nickname}
-                {post.author.verified && <span className={styles.verified}><Icon name="check" />已认证</span>}
+                <VerifiedBadge type={post.author.badge} showLabel />
               </span>
               <span className={styles.time}>{formatTime(post.created_at)}</span>
             </span>
@@ -148,7 +149,7 @@ export default function PostCard({ post, onChanged, variant = 'feed' }: { post: 
           <span className={styles.authorMeta}>
             <span className={styles.name}>
               {post.author.nickname}
-              {post.author.verified && <span className={styles.verified} aria-label="已认证"><Icon name="check" /></span>}
+              <VerifiedBadge type={post.author.badge} />
             </span>
             <span className={styles.time}>{formatTime(post.created_at)}</span>
           </span>

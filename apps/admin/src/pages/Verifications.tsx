@@ -13,7 +13,7 @@ import {
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import { api } from '../api'
-import type { Verification, VerificationStatus } from '../types'
+import type { Verification, VerificationStatus, VerificationType } from '../types'
 
 const statusText: Record<VerificationStatus, string> = {
   pending: '待审核',
@@ -25,6 +25,18 @@ const statusColor: Record<VerificationStatus, string> = {
   pending: 'gold',
   approved: 'green',
   rejected: 'red',
+}
+
+const typeText: Record<VerificationType, string> = {
+  admin: '管理员认证',
+  college: '学院认证',
+  institution: '机构认证',
+}
+
+const typeColor: Record<VerificationType, string> = {
+  admin: 'red',
+  college: 'blue',
+  institution: 'geekblue',
 }
 
 const OVERDUE_DAYS = 7
@@ -108,6 +120,14 @@ export default function Verifications() {
     { title: '昵称', dataIndex: 'nickname' },
     { title: '姓名', dataIndex: 'real_name' },
     { title: '学号', dataIndex: 'student_no' },
+    {
+      title: '认证类型',
+      dataIndex: 'type',
+      render: (type?: VerificationType) => {
+        const t = type || 'college'
+        return <Tag color={typeColor[t]}>{typeText[t]}</Tag>
+      },
+    },
     {
       title: '状态',
       dataIndex: 'status',

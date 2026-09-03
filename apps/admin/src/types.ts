@@ -35,6 +35,7 @@ export interface Dashboard {
 }
 
 export type VerificationStatus = 'pending' | 'approved' | 'rejected'
+export type VerificationType = 'admin' | 'college' | 'institution'
 
 export interface Verification {
   id: string
@@ -43,6 +44,7 @@ export interface Verification {
   real_name: string
   student_no: string
   material_url: string
+  type?: VerificationType
   status: VerificationStatus
   reject_reason?: string
   created_at: string

@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import Icon from '../components/Icon'
 import PostCard from '../components/PostCard'
 import { Avatar } from '../components/Avatar'
+import { VerifiedBadge } from '../components/VerifiedBadge'
 import { api, ApiError } from '../api/client'
 import { useAuth } from '../store/auth'
 import { useToast } from '../components/Toast'
@@ -75,7 +76,7 @@ export default function PublicProfilePage() {
             <div>
               <div>
                 <h1>{user.nickname}</h1>
-                {user.verified && <span><Icon name="check" />沈大学生</span>}
+                <VerifiedBadge type={user.badge} showLabel />
               </div>
               <p>{user.gender || '未设置性别'}</p>
               <small>只展示公开资料与已公开帖子</small>
